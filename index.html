@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MatterMind</title>
+  <meta name="description" content="Intelligence for the physical world." />
+
+  <style>
+	:root{
+  /* Anthropic-style white + copper */
+  --bg: #ffffff;
+  --text: #0f0f10;
+  --muted: #5c5f63;
+  --hairline: rgba(15,15,16,0.10);
+
+  /* Muted copper accent (serious, not flashy) */
+  --accent: #9a6336;
+
+  /* Reading width */
+  --max: 72ch;
+
+  /* Spacing scale (kept generous) */
+  --s1: 8px;
+  --s2: 12px;
+  --s3: 16px;
+  --s4: 24px;
+  --s5: 32px;
+  --s6: 48px;
+  --s7: 72px;
+  --s8: 96px;
+
+  --radius: 12px;
+}
+    *{ box-sizing: border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      line-height: 1.55;
+      letter-spacing: -0.01em;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    a{ color: inherit; text-decoration: none; }
+    a:hover{ text-decoration: underline; text-underline-offset: 4px; }
+
+    .wrap{
+      max-width: calc(var(--max) + 14rem);
+      margin: 0 auto;
+      padding: var(--s7) var(--s5) var(--s8);
+    }
+
+    header{
+      display:flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s4);
+      padding-bottom: var(--s6);
+      border-bottom: 1px solid var(--hairline);
+      margin-bottom: var(--s7);
+    }
+
+    .brand{
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      font-size: 18px;
+    }
+
+    .nav{
+      display:flex;
+      gap: var(--s4);
+      font-size: 14px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .nav a{ color: var(--muted); }
+    .nav a:hover{ color: var(--text); text-decoration: none; }
+
+    main{
+      max-width: var(--max);
+    }
+
+    .hero{
+      padding-top: var(--s2);
+      padding-bottom: var(--s7);
+    }
+
+    h1{
+      margin: 0 0 var(--s3);
+      font-size: clamp(40px, 5vw, 56px);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      font-weight: 650;
+    }
+
+    .lede{
+      margin: 0 0 var(--s5);
+      font-size: clamp(16px, 1.6vw, 18px);
+      color: var(--muted);
+      max-width: 60ch;
+    }
+
+    .ctaRow{
+      display:flex;
+      align-items:center;
+      gap: var(--s3);
+      flex-wrap: wrap;
+      margin-top: var(--s4);
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding: 12px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(17,17,17,0.18);
+      background: transparent;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .btn:hover{
+      text-decoration:none;
+      background: rgba(17,17,17,0.04);
+      border-color: rgba(17,17,17,0.28);
+      transform: translateY(-1px);
+    }
+
+    .btnPrimary{
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+    .btnPrimary:hover{
+      background: rgba(17,17,17,0.92);
+      border-color: rgba(17,17,17,0.92);
+    }
+
+    .micro{
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: var(--s3);
+    }
+
+    section{
+      padding: var(--s7) 0;
+      border-top: 1px solid var(--hairline);
+    }
+
+    h2{
+      margin: 0 0 var(--s4);
+      font-size: 18px;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+      font-weight: 650;
+    }
+
+    p{
+      margin: 0 0 var(--s4);
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 68ch;
+    }
+
+    .tri{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: var(--s4);
+      margin-top: var(--s5);
+    }
+
+    .card{
+      padding: var(--s5);
+      border: 1px solid rgba(17,17,17,0.12);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.50);
+      backdrop-filter: blur(4px);
+    }
+
+    .card h3{
+      margin: 0 0 var(--s2);
+      font-size: 16px;
+      letter-spacing: -0.02em;
+      font-weight: 650;
+      color: var(--text);
+    }
+
+    .card p{
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .list{
+      margin: var(--s4) 0 0;
+      padding: 0;
+      list-style: none;
+      display:grid;
+      gap: var(--s2);
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .list li{
+      padding-left: 14px;
+      position: relative;
+    }
+    .list li::before{
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      position: absolute;
+      left: 0;
+      top: 0.6em;
+      transform: translateY(-50%);
+      opacity: 0.85;
+    }
+
+    .split{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: var(--s5);
+      align-items:start;
+    }
+
+    .fine{
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    footer{
+      border-top: 1px solid var(--hairline);
+      margin-top: var(--s8);
+      padding-top: var(--s6);
+      color: var(--muted);
+      font-size: 13px;
+      display:flex;
+      justify-content: space-between;
+      gap: var(--s4);
+      flex-wrap: wrap;
+    }
+
+    /* Responsive */
+    @media (min-width: 860px){
+      .tri{ grid-template-columns: repeat(3, 1fr); }
+      .split{ grid-template-columns: 1.25fr 0.75fr; }
+    }
+
+    @media (max-width: 520px){
+      .wrap{ padding: var(--s6) var(--s4) var(--s7); }
+      header{ padding-bottom: var(--s5); margin-bottom: var(--s6); }
+      section{ padding: var(--s6) 0; }
+      .card{ padding: var(--s4); }
+      .nav{ gap: var(--s3); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">MatterMind</div>
+      <nav class="nav" aria-label="Primary">
+        <a href="#platform">Platform</a>
+        <a href="#safety">Safety</a>
+        <a href="#labs">R&amp;D Labs</a>
+        <a href="#company">Company</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </header>
+
+    <main>
+      <div class="hero">
+        <h1>Intelligence for the physical world.</h1>
+        <p class="lede">
+          MatterMind helps physical systems understand themselves, anticipate change, and act safely within real-world constraints.
+        </p>
+
+        <div class="ctaRow">
+          <a class="btn btnPrimary" href="#contact">Request a briefing</a>
+          <a class="btn" href="#platform">Explore the platform</a>
+        </div>
+
+        <div class="micro">Built for regulated environments. Designed for trust.</div>
+      </div>
+
+      <section id="platform">
+        <h2>What MatterMind does</h2>
+        <p>
+          Physical systems generate vast signals. They still rely on static rules and human judgment under pressure.
+          MatterMind provides a disciplined layer between observation and action.
+        </p>
+
+        <div class="tri">
+          <div class="card">
+            <h3>Understand</h3>
+            <p>Maintains a structured model of assets, states, constraints, and dependencies.</p>
+          </div>
+          <div class="card">
+            <h3>Reason</h3>
+            <p>Evaluates options, forecasts outcomes, and validates decisions before change.</p>
+          </div>
+          <div class="card">
+            <h3>Act safely</h3>
+            <p>Executes bounded interventions with auditability, permissioning, and human control.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="why">
+        <h2>Why now</h2>
+        <p>
+          Sensors are ubiquitous. Compute is abundant. AI is capable.
+          What has been missing is an intelligence layer designed for physical reality, not language.
+        </p>
+      </section>
+
+      <section id="start">
+        <h2>Where it starts</h2>
+        <div class="split">
+          <div>
+            <p>
+              MatterMind is built for environments where failure is not tolerated.
+              If it works here, it scales.
+            </p>
+          </div>
+          <div>
+            <ul class="list">
+              <li>Energy infrastructure</li>
+              <li>Industrial operations</li>
+              <li>Critical systems</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="safety">
+        <h2>Safety</h2>
+        <p>
+          MatterMind is designed to be trusted. Actions are bounded, traceable, and recoverable.
+        </p>
+        <ul class="list">
+          <li>Permissioned actions</li>
+          <li>Audit trails by default</li>
+          <li>Human-in-the-loop controls</li>
+          <li>Safe rollback and override</li>
+          <li>Deployment for regulated environments</li>
+        </ul>
+      </section>
+
+      <section id="labs">
+        <h2>R&amp;D Labs</h2>
+        <p>
+          MatterMind is developed as a deep-tech R&amp;D lab.
+          Correctness before growth. Simulation before action. Trust before autonomy.
+        </p>
+      </section>
+
+      <section id="company">
+        <h2>Company</h2>
+        <div class="split">
+          <div>
+            <p><strong>Mission</strong><br/>Make physical systems reasoning-capable and safe to operate at scale.</p>
+          </div>
+          <div>
+            <p class="fine"><strong>Values</strong></p>
+            <ul class="list">
+              <li>Correctness</li>
+              <li>Discipline</li>
+              <li>Safety</li>
+              <li>Leverage</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="contact">
+        <h2>Contact</h2>
+        <p>Request a briefing. We respond to qualified inquiries.</p>
+
+        <!-- Replace this with your form handler -->
+        <div class="card" style="background: rgba(255,255,255,0.65);">
+          <p class="fine" style="margin-bottom: 0;">
+            Email: <a href="mailto:briefing@mattermind.ai">briefing@mattermind.ai</a>
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        <div>©️ <span id="y"></span> MatterMind</div>
+        <div><a href="#platform">Back to top</a></div>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    document.getElementById("y").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
