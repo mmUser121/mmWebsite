@@ -479,6 +479,20 @@
       .bloom-wrap {
         aspect-ratio: 1 / 1.5;          /* wrapper 100vw × 150vw */
         background-size: 210%;          /* image renders 210vw × 210vw — cropped ~55vw each side */
+        /* Add side fades to the existing top-fade mask. At final scale the
+           wrapper edges sit at the viewport edges (invisible), but during
+           the reveal scale-up they sit inside the viewport — without these
+           fades the cropped image edge shows as a hard vertical line on
+           each side. mask-composite: intersect (= source-in for -webkit-)
+           multiplies the layer alphas so all three fades apply together. */
+        -webkit-mask-image:
+          linear-gradient(to bottom, transparent 0%, black 35%, black 100%),
+          linear-gradient(to right,  transparent 0%, black 8%,  black 92%, transparent 100%);
+                mask-image:
+          linear-gradient(to bottom, transparent 0%, black 35%, black 100%),
+          linear-gradient(to right,  transparent 0%, black 8%,  black 92%, transparent 100%);
+        -webkit-mask-composite: source-in;
+                mask-composite: intersect;
       }
     }
 
