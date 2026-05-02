@@ -982,7 +982,15 @@
     }
 
     /* Each letter starts hidden and is revealed by a glitch keyframe.
-       JS wraps the caption text in spans and sets stagger delays. */
+       JS wraps each word in a .glitch-word and each letter in a
+       .glitch-letter, with regular spaces (text nodes) between word
+       wrappers. The .glitch-word's white-space: nowrap blocks soft-wrap
+       opportunities between sibling .glitch-letter inline-blocks within
+       a word, so words like "physics" never split mid-character. */
+    .deeptech-caption .glitch-word {
+      display: inline-block;
+      white-space: nowrap;
+    }
     .deeptech-caption .glitch-letter {
       display: inline-block;
       white-space: pre;
@@ -1596,7 +1604,7 @@
        ========================================= -->
   <section class="section-f">
     <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
-      <p class="deeptech-caption">MatterMind is an R&amp;D lab building physics aware AI systems</p>
+      <p class="deeptech-caption">MatterMind is an R&amp;D lab building physics aware AI systems.</p>
     </div>
     <div class="deeptech-bloom-wrap" aria-hidden="true" data-parallax="0.05">
       <canvas id="deeptechParticles" class="deeptech-particles"></canvas>
@@ -1752,15 +1760,26 @@
       const caption = document.querySelector('.deeptech-caption');
       if (!caption) return;
 
-      const text = caption.textContent;
+      // Split into words so each word can be wrapped in a non-breaking
+      // .glitch-word — without this, every .glitch-letter inline-block
+      // creates a soft-wrap opportunity and words can split mid-character.
+      const words = caption.textContent.split(' ');
       caption.textContent = '';
-      for (let i = 0; i < text.length; i++) {
-        const span = document.createElement('span');
-        span.className = 'glitch-letter';
-        span.textContent = text[i];
-        span.style.setProperty('--letter-delay', (i * 50) + 'ms');
-        caption.appendChild(span);
-      }
+      let letterIdx = 0;
+      words.forEach((word, wi) => {
+        if (wi > 0) caption.appendChild(document.createTextNode(' '));
+        const wordWrap = document.createElement('span');
+        wordWrap.className = 'glitch-word';
+        for (let i = 0; i < word.length; i++) {
+          const span = document.createElement('span');
+          span.className = 'glitch-letter';
+          span.textContent = word[i];
+          span.style.setProperty('--letter-delay', (letterIdx * 50) + 'ms');
+          wordWrap.appendChild(span);
+          letterIdx++;
+        }
+        caption.appendChild(wordWrap);
+      });
 
       if (!('IntersectionObserver' in window)) {
         caption.classList.add('in-view');
