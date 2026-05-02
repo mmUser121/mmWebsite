@@ -530,7 +530,7 @@
          is set by the reveal IntersectionObserver. */
       width: 0;
       height: 1px;
-      background: rgba(255, 255, 255, 0.5);
+      background: #FFFFFF;
       margin-bottom: 16px;
       transition: width 1120ms cubic-bezier(.16, .84, .32, 1);
     }
@@ -541,7 +541,7 @@
       top: 50%;
       width: 8px;
       height: 8px;
-      background: rgba(255, 255, 255, 0.5);
+      background: #FFFFFF;
       transform: translateY(-50%);
     }
     /* Mobile: line extends from the caption-block's left edge out to the
@@ -2506,13 +2506,17 @@
       const embers = [];
 
       function resize() {
-        const rect = stage.getBoundingClientRect();
-        W = rect.width;
-        H = rect.height;
+        // Use offsetWidth/Height (layout size, transform-independent) so the
+        // canvas always tracks the wrapper's natural box even while .bloom-wrap
+        // is mid-reveal at scale(0.70). getBoundingClientRect would return the
+        // post-transform rect — that previously caused the canvas to be sized
+        // and anchored to the wrapper's top-left at 70% size on first init.
+        // Don't set canvas.style.width/height — the CSS rule
+        // .bloom-pulse { width: 100%; height: 100% } handles display sizing.
+        W = stage.offsetWidth;
+        H = stage.offsetHeight;
         canvas.width = Math.round(W * DPR);
         canvas.height = Math.round(H * DPR);
-        canvas.style.width = W + 'px';
-        canvas.style.height = H + 'px';
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         // The bloom image is rendered ~30% larger on mobile (background-size
         // 175% vs 135%); scale particles to match so they don't shrink
