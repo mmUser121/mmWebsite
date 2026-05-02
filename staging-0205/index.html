@@ -449,7 +449,7 @@
          off until the transform transitionend fires (see JS) so the GPU
          isn't fighting an animating wrapper AND a live canvas. */
       opacity: 0.5;
-      transform: scale(0.96);
+      transform: scale(0.70);
       transition:
         opacity   1800ms cubic-bezier(.16, .84, .32, 1),
         transform 1800ms cubic-bezier(.16, .84, .32, 1);
@@ -478,7 +478,7 @@
     @media (max-width: 767px) {
       .bloom-wrap {
         aspect-ratio: 1 / 1.5;          /* wrapper 100vw × 150vw */
-        background-size: 175%;          /* image renders 175vw × 175vw */
+        background-size: 210%;          /* image renders 210vw × 210vw — cropped ~55vw each side */
       }
     }
 
@@ -698,12 +698,6 @@
     @media (min-width: 1024px) {
       .h2-display { font-size: 76px; }
       .body-copy p.body-fine { font-size: clamp(16px, 1.45vw, 20px); }
-    }
-    /* Mobile-only heading downscale: every 60px H2 drops to 48px below md. */
-    @media (max-width: 767px) {
-      .h2-display,
-      .intel-heading,
-      .footer-col h3 { font-size: 48px; }
     }
 
     /* ===========================
@@ -1171,6 +1165,16 @@
     }
     .footer-col h3 .h2-line { display: block; }
 
+    /* Mobile-only heading downscale: .h2-display, .intel-heading, and
+       .footer-col h3 all drop from 60px to 48px below 768px. Placed AFTER
+       the base rules for all three so source order wins the cascade
+       (selectors are equal specificity; media queries don't add any). */
+    @media (max-width: 767px) {
+      .h2-display,
+      .intel-heading,
+      .footer-col h3 { font-size: 48px; }
+    }
+
     .footer-col p {
       font-family: 'Sora', sans-serif;
       font-weight: 200;
@@ -1470,7 +1474,7 @@
        Combined stage so caption overlays the bloom on the left and
        the C content overlays it on the right (desktop). They stack on mobile.
        ========================================= -->
-  <section id="vision" class="section-bc">
+  <section class="section-bc">
     <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
       <div class="bc-stage">
 
@@ -1481,8 +1485,10 @@
           <!-- END: bloom right-half pulse (HTML) -->
         </div>
 
-        <!-- Caption — overlays bloom on the left (desktop), stacks below (mobile) -->
-        <div class="caption-block">
+        <!-- Caption — overlays bloom on the left (desktop), stacks below (mobile).
+             id="vision" sits here (not on the parent <section>) so the nav
+             "Vision" link scrolls the user to the white caption-rule line. -->
+        <div id="vision" class="caption-block">
           <span class="caption-rule" aria-hidden="true"></span>
           <p class="caption-tag">QUANTUM BLOOMS:</p>
           <p class="caption-text">
