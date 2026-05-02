@@ -2025,7 +2025,11 @@
 
       const ctx = canvas.getContext('2d');
       const particles = [];
-      const MAX = 120;              // doubled from 60; still well within fps budget
+      // Mobile gets ~35% fewer particles than desktop (120 → 78).
+      const MAX = window.innerWidth >= 768 ? 120 : 78;
+      // Initial double-spawn threshold — scaled with MAX so the relative
+      // fill cadence stays consistent across viewports (was hardcoded 76).
+      const FILL_TO = Math.round(MAX * 0.633);
       const FRAME_MS = 1000 / 24;   // throttle to ~24fps — gentler on GPU
       let W = 0, H = 0;
       let last = 0;
@@ -2082,7 +2086,7 @@
           ctx.clearRect(0, 0, W, H);
           if (particles.length < MAX && Math.random() < 0.75) {
             spawn();
-            if (particles.length < 76) spawn();   // scaled with MAX
+            if (particles.length < FILL_TO) spawn();   // double-spawn while filling
           }
           for (let i = particles.length - 1; i >= 0; i--) {
             const p = particles[i];
