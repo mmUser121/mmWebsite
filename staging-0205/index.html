@@ -90,8 +90,12 @@
        stays at its default 0 and `100% + 0px` ≡ `bottom`. */
     @media (max-width: 767px) {
       .hero {
-        background-size: auto 135%;
-        background-position: center calc(100% + var(--parallax-y, 0px));
+        /* Bloom scaled down to 108% (was 135%). Position offsets the image
+           top by -22vh so its centre still lands at 32vh = 32% of the hero,
+           keeping it aligned with the M-mark (top: 32%) and the particle
+           emission strip (emitYRatio = 0.32). */
+        background-size: auto 108%;
+        background-position: center calc(-22vh + var(--parallax-y, 0px));
       }
     }
 
@@ -228,6 +232,9 @@
       width: auto;
       opacity: 1;
     }
+    @media (max-width: 767px) {
+      .wordmark { height: 14px; }
+    }
 
     /* Center mark logo — absolutely centred on the hero, sitting at the
        centre of the particle bloom. */
@@ -252,7 +259,7 @@
        room to breathe below it. */
     @media (max-width: 767px) {
       .mark {
-        width: 130px;
+        width: 98px;
         top: 32%;
       }
     }
@@ -283,7 +290,7 @@
       .hero-text {
         top: 32%;
         margin-top: 110px;
-        padding: 0 56px;
+        padding: 0 60px;
       }
     }
 
@@ -526,9 +533,9 @@
     /* Mobile: line extends from the caption-block's left edge out to the
        horizontal centre of the viewport — matches the desktop intent where
        the line ends below the bloom's bright glow (which is also centred).
-       The offset matches the section container's mobile px-16 (64px) and
+       The offset matches the section container's mobile px-10 (40px) and
        md:px-6 (24px) padding. */
-    .caption-block.in-view .caption-rule { width: calc(50vw - 64px); }
+    .caption-block.in-view .caption-rule { width: calc(50vw - 40px); }
     @media (min-width: 768px) {
       .caption-block.in-view .caption-rule { width: calc(50vw - 24px); }
     }
@@ -575,7 +582,7 @@
         transform: none !important;
       }
       /* Static fallback widths at rest — match the in-view targets per breakpoint. */
-      .caption-rule { width: calc(50vw - 64px) !important; }
+      .caption-rule { width: calc(50vw - 40px) !important; }
     }
     @media (prefers-reduced-motion: reduce) and (min-width: 768px) {
       .caption-rule { width: calc(50vw - 24px) !important; }
@@ -691,6 +698,12 @@
     @media (min-width: 1024px) {
       .h2-display { font-size: 76px; }
       .body-copy p.body-fine { font-size: clamp(16px, 1.45vw, 20px); }
+    }
+    /* Mobile-only heading downscale: every 60px H2 drops to 48px below md. */
+    @media (max-width: 767px) {
+      .h2-display,
+      .intel-heading,
+      .footer-col h3 { font-size: 48px; }
     }
 
     /* ===========================
@@ -1399,7 +1412,7 @@
 
       <!-- ========== NAVBAR ========== -->
       <header class="w-full">
-        <nav class="relative max-w-[1440px] mx-auto px-16 md:px-10 lg:px-14 py-6 md:py-7 flex items-center justify-between">
+        <nav class="relative max-w-[1440px] mx-auto px-10 md:px-10 lg:px-14 py-6 md:py-7 flex items-center justify-between">
 
           <!-- Wordmark / Logo -->
           <a href="#" class="flex items-center" aria-label="Mattermind home">
@@ -1458,7 +1471,7 @@
        the C content overlays it on the right (desktop). They stack on mobile.
        ========================================= -->
   <section id="vision" class="section-bc">
-    <div class="max-w-[1650px] mx-auto px-16 md:px-6 lg:px-8">
+    <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
       <div class="bc-stage">
 
         <!-- Bloom -->
@@ -1506,12 +1519,12 @@
       <img src="images/mm_indent_small_grey.svg" alt="" class="divider-mark" aria-hidden="true" loading="lazy" decoding="async" />
 
       <div class="divider-label-row divider-label-row-top">
-        <div class="max-w-[1650px] mx-auto px-16 md:px-6 lg:px-8">
+        <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
           <p class="divider-label">OBSERVATION</p>
         </div>
       </div>
       <div class="divider-label-row divider-label-row-bottom">
-        <div class="max-w-[1650px] mx-auto px-16 md:px-6 lg:px-8">
+        <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
           <p class="divider-label">ACTION</p>
         </div>
       </div>
@@ -1522,7 +1535,7 @@
        SECTION E — Our intelligence
        ========================================= -->
   <section id="intelligence" class="section-e">
-    <div class="max-w-[1280px] mx-auto px-16 md:px-10 lg:px-14">
+    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
       <h2 class="intel-heading">
         <span class="h2-line">Our</span>
         <span class="h2-line">intelligence&hellip;</span>
@@ -1560,7 +1573,7 @@
        SECTION F — Deep-tech band
        ========================================= -->
   <section class="section-f">
-    <div class="max-w-[1280px] mx-auto px-16 md:px-10 lg:px-14">
+    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
       <p class="deeptech-caption">Mattermind is a deep-tech R&amp;D lab.</p>
     </div>
     <div class="deeptech-bloom-wrap" aria-hidden="true" data-parallax="0.05">
@@ -1572,7 +1585,7 @@
        SECTION G — Philosophy statement
        ========================================= -->
   <section class="section-g">
-    <div class="max-w-[1280px] mx-auto px-16 md:px-10 lg:px-14">
+    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
       <p class="philosophy">
         <em class="key">Correctness</em> before growth. <em class="key">Simulation</em> before action. <em class="key">Trust</em> before autonomy.
       </p>
@@ -1586,7 +1599,7 @@
     <!-- Industrial line-art background sits at the bottom of the section. -->
     <div class="footer-bg" aria-hidden="true" data-parallax="0.10"></div>
 
-    <div class="footer-content max-w-[1280px] mx-auto px-16 md:px-10 lg:px-14">
+    <div class="footer-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
       <div class="footer-grid">
 
         <!-- Left column — invitation -->
