@@ -1179,11 +1179,13 @@
     }
     .footer-col h3 .h2-line { display: block; }
 
-    /* Mobile-only heading downscale: .h2-display, .intel-heading, and
-       .footer-col h3 all drop from 60px to 48px below 768px. Placed AFTER
-       the base rules for all three so source order wins the cascade
-       (selectors are equal specificity; media queries don't add any). */
+    /* Mobile-only heading downscale: .h1-display, .h2-display,
+       .intel-heading, and .footer-col h3 all drop to 48px below 768px.
+       Placed AFTER the base rules for all four so source order wins the
+       cascade (selectors are equal specificity; media queries don't add
+       any). For .h1-display this overrides the clamp() floor of 50px. */
     @media (max-width: 767px) {
+      .h1-display,
       .h2-display,
       .intel-heading,
       .footer-col h3 { font-size: 48px; }
