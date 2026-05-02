@@ -1501,10 +1501,8 @@
           <!-- END: bloom right-half pulse (HTML) -->
         </div>
 
-        <!-- Caption — overlays bloom on the left (desktop), stacks below (mobile).
-             id="vision" sits here (not on the parent <section>) so the nav
-             "Vision" link scrolls the user to the white caption-rule line. -->
-        <div id="vision" class="caption-block">
+        <!-- Caption — overlays bloom on the left (desktop), stacks below (mobile). -->
+        <div class="caption-block">
           <span class="caption-rule" aria-hidden="true"></span>
           <p class="caption-tag">QUANTUM BLOOMS:</p>
           <p class="caption-text">
@@ -1513,14 +1511,16 @@
         </div>
 
         <!-- We are mattermind — overlays bloom on the right (desktop), stacks below (mobile) -->
-        <div class="c-content reveal-up" style="--reveal-delay: 150ms;">
+        <!-- id="vision" sits on .c-content so the "Vision" nav link
+             scrolls the user to the "We are mattermind" header. -->
+        <div id="vision" class="c-content reveal-up" style="--reveal-delay: 150ms;">
           <h2 class="h2-display">
             <span class="h2-line">We are</span>
             <span class="h2-line">mattermind</span>
           </h2>
           <div class="body-copy">
-            <p>We&rsquo;re building intelligence embedded within physical matter - systems that perceive cause and effect, learn from it, and continuously evolve to shape better realities.</p>
-            <p>We&rsquo;re reframing intelligence into the fundamental properties of the universe to change how we understand what it means to think, learn, and exist.</p>
+            <p>We are building intelligence embedded within physical matter systems that perceive cause and effect, learn from it, and continuously evolve to shape better realities.</p>
+            <p>We are reframing intelligence into the fundamental properties of the universe to change how we understand what it means to think, learn, and exist.</p>
             <p class="body-fine">Physical systems generate vast signals. They still rely on static rules and human judgement under pressure. Mattermind provides a disciplined layer between observation and action.</p>
           </div>
         </div>
@@ -1596,7 +1596,7 @@
        ========================================= -->
   <section class="section-f">
     <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
-      <p class="deeptech-caption">Mattermind is a deep-tech R&amp;D lab.</p>
+      <p class="deeptech-caption">MatterMind is an R&amp;D lab building physics aware AI systems</p>
     </div>
     <div class="deeptech-bloom-wrap" aria-hidden="true" data-parallax="0.05">
       <canvas id="deeptechParticles" class="deeptech-particles"></canvas>
