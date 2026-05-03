@@ -1,1 +1,1 @@
-Docs serves the live site!
+Docs folder serves the live site!
