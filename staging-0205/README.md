@@ -1,6 +1,6 @@
-# Mattermind Website V1.0
+# MatterMind Website V1.0
 
-Single-page marketing site for **Mattermind** — a deep-tech R&D lab embedding intelligence into the foundations of reality.
+Single-page marketing site for **MatterMind** — a deep-tech R&D lab embedding intelligence into the foundations of reality.
 
 ## Running locally
 
