@@ -8,6 +8,22 @@
   <meta name="color-scheme" content="dark" />
   <title>MatterMind | AI for the Physical World and Industrial Intelligence.</title>
 
+  <!-- Google tag (gtag.js) — production only (mattermind.ai) -->
+  <script>
+    (function () {
+      var host = location.hostname;
+      if (host !== 'mattermind.ai' && host !== 'www.mattermind.ai') return;
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-PCS3P86T6T';
+      document.head.appendChild(s);
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-PCS3P86T6T');
+    })();
+  </script>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
