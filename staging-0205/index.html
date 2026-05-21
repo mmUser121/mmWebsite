@@ -1391,6 +1391,20 @@
       box-shadow: 0 0 22px rgba(229, 115, 102, 0.25);
     }
 
+    .footer-locations {
+      position: relative;
+      z-index: 3;
+      text-align: center;
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.85);
+      white-space: nowrap;
+      margin: 0;
+      padding-top: clamp(8px, 1vw, 14px);
+    }
+
     .footer-copyright {
       position: relative;
       z-index: 3;
@@ -1400,7 +1414,8 @@
       font-size: 12px;
       letter-spacing: 0.04em;
       color: rgba(255, 255, 255, 0.4);
-      padding: clamp(20px, 2.5vw, 36px) 0 clamp(24px, 3vw, 40px);
+      margin: 0;
+      padding: clamp(4px, 0.5vw, 8px) 0 clamp(24px, 3vw, 40px);
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1755,6 +1770,7 @@
 
       </div>
 
+      <p class="footer-locations">New York&nbsp;|&nbsp;London&nbsp;|&nbsp;Bangalore</p>
       <p class="footer-copyright">© 2026 MatterMind Inc.</p>
     </div>
   </section>
