@@ -1203,9 +1203,21 @@
       pointer-events: none;
     }
     /* Mobile: lift the line-art bg so its bottom edge sits above the
-       locations + copyright lines instead of running behind them. */
+       locations + copyright lines instead of running behind them, and
+       add a bottom-fade pseudo-element so the dark "ground" portion of
+       the image dissolves into the floor colour (#191A24) instead of
+       sitting as a hard dark band over the lighter floor. */
     @media (max-width: 767px) {
       .footer-bg { bottom: 90px; }
+      .footer-bg::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom,
+          rgba(25, 26, 36, 0) 75%,
+          rgba(25, 26, 36, 1) 100%);
+        pointer-events: none;
+      }
     }
 
     .footer-content {
