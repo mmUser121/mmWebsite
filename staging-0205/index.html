@@ -1154,6 +1154,24 @@
       overflow: hidden;
     }
 
+    /* Dark "floor" at the bottom of the section so the line-art image
+       dissolves into a colour close to its own bottom edge instead of
+       meeting the navy section bg with a visible seam. Sits BEHIND the
+       image (z-0 vs z-1), so the image still reads at 75% opacity on
+       top of it. On mobile the floor also fills the 90px image-lift gap
+       below the image so the locations + copyright text sit on the
+       darker floor instead of plain navy. */
+    .footer-floor {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: clamp(110px, 12vw, 200px);
+      background-color: #191A24;
+      z-index: 0;
+      pointer-events: none;
+    }
+
     /* Industrial line-art background image at the bottom of the section.
        Tall enough to show the full skyline silhouette per the designs. */
     .footer-bg {
@@ -1183,6 +1201,23 @@
         rgba(35, 38, 52, 1) 0%,
         rgba(35, 38, 52, 0) 18%);
       pointer-events: none;
+    }
+    /* Mobile: lift the line-art bg so its bottom edge sits above the
+       locations + copyright lines instead of running behind them, and
+       add a bottom-fade pseudo-element so the dark "ground" portion of
+       the image dissolves into the floor colour (#191A24) instead of
+       sitting as a hard dark band over the lighter floor. */
+    @media (max-width: 767px) {
+      .footer-bg { bottom: 90px; }
+      .footer-bg::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom,
+          rgba(25, 26, 36, 0) 75%,
+          rgba(25, 26, 36, 1) 100%);
+        pointer-events: none;
+      }
     }
 
     .footer-content {
@@ -1391,6 +1426,20 @@
       box-shadow: 0 0 22px rgba(229, 115, 102, 0.25);
     }
 
+    .footer-locations {
+      position: relative;
+      z-index: 3;
+      text-align: center;
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.85);
+      white-space: nowrap;
+      margin: 0;
+      padding-top: clamp(8px, 1vw, 14px);
+    }
+
     .footer-copyright {
       position: relative;
       z-index: 3;
@@ -1400,7 +1449,8 @@
       font-size: 12px;
       letter-spacing: 0.04em;
       color: rgba(255, 255, 255, 0.4);
-      padding: clamp(20px, 2.5vw, 36px) 0 clamp(24px, 3vw, 40px);
+      margin: 0;
+      padding: clamp(4px, 0.5vw, 8px) 0 clamp(24px, 3vw, 40px);
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1686,6 +1736,7 @@
        ========================================= -->
   <section id="join" class="section-h">
     <!-- Industrial line-art background sits at the bottom of the section. -->
+    <div class="footer-floor" aria-hidden="true"></div>
     <div class="footer-bg" aria-hidden="true" data-parallax="0.10"></div>
 
     <div class="footer-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
@@ -1698,7 +1749,7 @@
             <span class="h2-line">a new reality</span>
           </h3>
           <p>
-            We are seeking individuals who possess the rare combination of technical mastery combined with physical curiosity. <a href="mailto:roles@mattermind.ai">Join us</a> on our journey.
+            We are seeking individuals who possess the rare combination of technical mastery combined with physical curiosity. <a href="mailto:support@mattermind.ai">Join us</a> on our journey.
           </p>
         </div>
 
@@ -1755,6 +1806,7 @@
 
       </div>
 
+      <p class="footer-locations">New York&nbsp;|&nbsp;London&nbsp;|&nbsp;Bangalore</p>
       <p class="footer-copyright">© 2026 MatterMind Inc.</p>
     </div>
   </section>
