@@ -1154,6 +1154,24 @@
       overflow: hidden;
     }
 
+    /* Dark "floor" at the bottom of the section so the line-art image
+       dissolves into a colour close to its own bottom edge instead of
+       meeting the navy section bg with a visible seam. Sits BEHIND the
+       image (z-0 vs z-1), so the image still reads at 75% opacity on
+       top of it. On mobile the floor also fills the 90px image-lift gap
+       below the image so the locations + copyright text sit on the
+       darker floor instead of plain navy. */
+    .footer-floor {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: clamp(110px, 12vw, 200px);
+      background-color: #0B0D14;
+      z-index: 0;
+      pointer-events: none;
+    }
+
     /* Industrial line-art background image at the bottom of the section.
        Tall enough to show the full skyline silhouette per the designs. */
     .footer-bg {
@@ -1706,6 +1724,7 @@
        ========================================= -->
   <section id="join" class="section-h">
     <!-- Industrial line-art background sits at the bottom of the section. -->
+    <div class="footer-floor" aria-hidden="true"></div>
     <div class="footer-bg" aria-hidden="true" data-parallax="0.10"></div>
 
     <div class="footer-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
