@@ -1184,6 +1184,11 @@
         rgba(35, 38, 52, 0) 18%);
       pointer-events: none;
     }
+    /* Mobile: lift the line-art bg so its bottom edge sits above the
+       locations + copyright lines instead of running behind them. */
+    @media (max-width: 767px) {
+      .footer-bg { bottom: 90px; }
+    }
 
     .footer-content {
       position: relative;
