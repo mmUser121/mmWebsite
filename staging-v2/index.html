@@ -1,0 +1,2926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="MatterMind is a deep-tech R&D lab embedding intelligence into the foundations of reality — bringing perception, reasoning, and autonomy into the systems that shape the physical world." />
+  <meta name="theme-color" content="#232634" />
+  <meta name="color-scheme" content="dark" />
+  <title>MatterMind | AI for the Physical World and Industrial Intelligence.</title>
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="images/mm_192.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="images/mm_192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png" />
+
+  <!-- Organization structured data (Google knowledge panel) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "MatterMind",
+    "url": "https://mattermind.ai",
+    "logo": "https://mattermind.ai/images/mm_192.png",
+    "description": "MatterMind is a deep-tech R&D lab embedding intelligence into the foundations of reality — bringing perception, reasoning, and autonomy into the systems that shape the physical world."
+  }
+  </script>
+
+  <!-- Google tag (gtag.js) — production only (mattermind.ai) -->
+  <script>
+    (function () {
+      var host = location.hostname;
+      if (host !== 'mattermind.ai' && host !== 'www.mattermind.ai') return;
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-PCS3P86T6T';
+      document.head.appendChild(s);
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-PCS3P86T6T');
+    })();
+  </script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Preload the hero background image so it lands with the first paint
+       rather than after CSS parses. Other large bg images are below the
+       fold and load naturally as the user scrolls. -->
+  <link rel="preload" as="image" href="images/hero_bg_2400.webp" fetchpriority="high">
+
+  <!-- Google Fonts: Noto Serif Display, Sora, Share Tech Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Display:ital,wght@0,300;0,400;1,300&family=Share+Tech+Mono&family=Sora:wght@100;200;300;400&display=swap" rel="stylesheet">
+
+  <!-- Tailwind theme extension -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            mm: {
+              bg:     '#232634',
+              text:   '#FFFFFF',
+              accent: '#E57366',
+              blue:   '#446D9F',
+            }
+          },
+          fontFamily: {
+            serif: ['"Noto Serif Display"', 'serif'],
+            sans:  ['Sora', 'system-ui', 'sans-serif'],
+            mono:  ['"Share Tech Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* ===========================
+       Base
+       =========================== */
+    html { scroll-behavior: smooth; }
+    body {
+      background-color: #232634;
+      color: #FFFFFF;
+      font-family: 'Sora', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ===========================
+       Hero
+       =========================== */
+    /* Hero — the bloom image is painted as a background with background-blend-mode
+       (paint-time, cached) instead of mix-blend-mode (composite-time, recomputed each
+       frame). This is the single biggest performance win for the hero. */
+    .hero {
+      position: relative;
+      /* z-index 2 puts the hero ABOVE the section below it (B+C). The
+         bloom-wrap then sits BEHIND the hero in the overlap region, so
+         the hero's natural bottom-fade dissolves into navy without a hard
+         seam against the bloom's top edge. */
+      z-index: 2;
+      min-height: 100vh;
+      overflow: hidden;
+      background-color: #232634;
+      background-image: url('images/hero_bg_2400.webp');
+      background-size: cover;
+      /* --parallax-y is set by the generic parallax controller in JS (desktop
+         only). When unset, falls back to 0 → identical to "center center". */
+      background-position: center calc(50% + var(--parallax-y, 0px));
+      background-repeat: no-repeat;
+      background-blend-mode: screen;
+    }
+
+    /* Mobile: scale the bloom image larger than the viewport (135% of
+       container height) and anchor it to the bottom — this lets the bright
+       horizontal particle line sit at exactly 32% of the viewport, matching
+       the M-mark's vertical centre. Parallax is OFF on mobile so --parallax-y
+       stays at its default 0 and `100% + 0px` ≡ `bottom`. */
+    @media (max-width: 767px) {
+      .hero {
+        /* Bloom scaled down to 108% (was 135%). Position offsets the image
+           top by -22vh so its centre still lands at 32vh = 32% of the hero,
+           keeping it aligned with the M-mark (top: 32%) and the particle
+           emission strip (emitYRatio = 0.32). */
+        background-size: auto 108%;
+        background-position: center calc(-22vh + var(--parallax-y, 0px));
+      }
+    }
+
+    /* Top header gradient — 100% #446D9F at top -> 0% at bottom */
+    .hero-gradient {
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 30%;
+      background: linear-gradient(
+        to bottom,
+        rgba(68, 109, 159, 1) 0%,
+        rgba(68, 109, 159, 0) 100%
+      );
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Particle canvas — particles emit from the bloom centre and drift outward.
+       Additive blending is handled inside the canvas (globalCompositeOperation),
+       so we don't pay for a mix-blend-mode layer. translateZ(0) + will-change
+       force the canvas onto its own GPU layer so each canvas frame doesn't
+       force re-paint of the hero's screen-blended background underneath
+       (this was the hidden fps drain). */
+    .hero-particles {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0;
+      animation: hero-fade-in 900ms ease forwards;
+      transform: translateZ(0);
+      will-change: transform;
+    }
+
+    @keyframes hero-fade-in { to { opacity: 1; } }
+
+    /* Soft vignette so the image fades into page background at the bottom */
+    .hero-fade {
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 30%;
+      background: linear-gradient(
+        to bottom,
+        rgba(35, 38, 52, 0) 0%,
+        rgba(35, 38, 52, 1) 100%
+      );
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .hero-content { position: absolute; inset: 0; z-index: 4; }
+
+    /* ===========================
+       Typography (per design system)
+       1pt ≈ 1.333px  →  H1 90pt = 120px,  Intro 26pt = ~35px,  Body 22pt = ~29px
+       =========================== */
+    .h1-display {
+      font-family: 'Noto Serif Display', serif;
+      font-weight: 300;                                  /* Light */
+      font-size: clamp(50px, 5.44vw, 78px);
+      line-height: 1.08;
+      letter-spacing: -0.005em;
+      color: #FFFFFF;
+    }
+    .h1-display .italic-line {
+      display: block;
+      font-style: italic;
+      font-weight: 300;                                  /* Light Italic */
+      letter-spacing: 0;
+    }
+
+    .intro-text {
+      font-family: 'Sora', sans-serif;
+      font-weight: 200;                                  /* Thin */
+      font-size: clamp(15px, 1.25vw, 22px);
+      line-height: 1.55;
+      letter-spacing: 0.005em;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .nav-link {
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 12px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.92);
+      transition: color 0.2s ease;
+    }
+    .nav-link:hover,
+    .nav-link:focus,
+    .nav-link:active { color: #FFA398; }
+
+    /* Vertical pipe separators between nav items (desktop) — centred in the gap */
+    .nav-list li { position: relative; }
+    .nav-list li + li::before {
+      content: "";
+      position: absolute;
+      left: -1rem;          /* half of gap-8 (2rem) */
+      top: 50%;
+      transform: translateY(-50%);
+      width: 1px;
+      height: 14px;
+      background: rgba(255, 255, 255, 0.35);
+    }
+    @media (min-width: 1024px) {
+      .nav-list li + li::before { left: -1.5rem; }  /* half of lg:gap-12 (3rem) */
+    }
+
+    /* CTA button — title case per design */
+    .btn-cta {
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+      padding: 10px 22px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 4px;
+      color: #FFFFFF;
+      transition: all 0.25s ease;
+      white-space: nowrap;
+    }
+    .btn-cta:hover {
+      border-color: #E57366;
+      color: #E57366;
+      box-shadow: 0 0 20px rgba(229, 115, 102, 0.25);
+    }
+
+    /* Wordmark */
+    .wordmark {
+      height: 24px;
+      width: auto;
+      opacity: 1;
+    }
+    @media (max-width: 767px) {
+      .wordmark { height: 14px; }
+    }
+
+    /* Center mark logo — absolutely centred on the hero, sitting at the
+       centre of the particle bloom. */
+    .mark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(.97);
+      width: clamp(80px, 7vw, 130px);
+      height: auto;
+      z-index: 4;
+      filter: drop-shadow(0 0 28px rgba(255, 255, 255, 0.35));
+      pointer-events: none;
+      opacity: 0;
+      /* mark-pulse animation removed — animating drop-shadow filter forces
+         a per-frame repaint with a 28-42px blur kernel, which was a major
+         fps drain. The static drop-shadow above is painted once and cached. */
+      animation: mark-reveal 1300ms cubic-bezier(.2,.6,.2,1) 200ms forwards;
+    }
+
+    /* Mobile: bigger M-mark, positioned higher so the wrapped headline has
+       room to breathe below it. */
+    @media (max-width: 767px) {
+      .mark {
+        width: 98px;
+        top: 32%;
+      }
+    }
+
+    @keyframes mark-reveal {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(.97); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1);   }
+    }
+
+    /* Hero text block — anchored just below the M-mark so it always
+       presents underneath the ident and never overlaps it on resize. */
+    .hero-text {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translateX(-50%);
+      margin-top: clamp(72px, 5.6vw, 100px);
+      width: 100%;
+      max-width: 1100px;
+      padding: 0 1.5rem;
+      text-align: center;
+      z-index: 4;
+    }
+
+    /* Mobile: wider side margins so the headline wraps closer to the
+       design, and anchored higher to follow the raised M-mark. */
+    @media (max-width: 767px) {
+      .hero-text {
+        top: 32%;
+        margin-top: 110px;
+        padding: 0 60px;
+      }
+    }
+
+    /* Sequenced reveal — words fade up one by one, then the subheader.
+       Timings are tuned for a slow, deliberate "luxury" cadence. */
+    .h1-display .word {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(10px);
+      animation: line-reveal 1300ms cubic-bezier(.2,.6,.2,1) forwards;
+    }
+
+    .intro-text {
+      opacity: 0;
+      transform: translateY(8px);
+      animation: line-reveal 1200ms cubic-bezier(.2,.6,.2,1) 2700ms forwards;
+    }
+
+    @keyframes line-reveal {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+
+    /* Respect users who prefer reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .hero-particles,
+      .mark,
+      .h1-display .word,
+      .intro-text {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none;
+      }
+      .mark { transform: translate(-50%, -50%) !important; }
+      .hero-text { transform: translateX(-50%) !important; }
+    }
+
+    /* Mobile menu icon */
+    .menu-icon {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 6px;
+    }
+    .menu-icon span {
+      display: block;
+      width: 24px;
+      height: 1.5px;
+      background: #FFFFFF;
+      border-radius: 2px;
+    }
+
+    /* Mobile menu overlay — when open, the four menu options appear as a
+       right-aligned column with 1px dividers over a dark backdrop. Mobile
+       only; at md+ the entire #mobileNav is hidden via the `md:hidden`
+       Tailwind class on the element. */
+    @media (max-width: 767px) {
+      #mobileNav {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(15, 17, 25, 0.94);
+        padding: 88px 32px 32px;       /* room for the navbar + comfortable side padding */
+        /* Hidden by default; .is-open fades it in. visibility transitioned
+           with the same duration so the element becomes interactive only
+           once the fade has completed. */
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 280ms ease, visibility 280ms ease;
+      }
+      #mobileNav.is-open {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+      #mobileNav ul {
+        display: flex;
+        flex-direction: column;
+        gap: 0;                        /* spacing handled by per-item padding + borders */
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      #mobileNav ul li {
+        width: 100%;
+        text-align: right;
+        padding: 22px 0;               /* adequate vertical spacing between links */
+        border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+      }
+      #mobileNav ul li:first-child {
+        border-top: 1px solid rgba(255, 255, 255, 0.18);
+      }
+      /* In the overlay, treat all four entries as uniform nav links — the
+         CTA loses its outlined-button look so it sits flush with the others. */
+      #mobileNav .nav-link,
+      #mobileNav .btn-cta {
+        display: inline-block;
+        border: none;
+        background: none;
+        padding: 0;
+        box-shadow: none;
+        font-family: 'Sora', sans-serif;
+        font-weight: 300;
+        font-size: 14px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.92);
+      }
+      #mobileNav a:hover,
+      #mobileNav a:active {
+        color: #FFA398;
+      }
+    }
+
+    /* ===========================
+       Sections B + C — Transition Visual + "We are MatterMind"
+       Combined into a single stage so on desktop the caption can overlap
+       the bloom on the left and the C content can overlap on the right.
+       On mobile they stack vertically.
+       =========================== */
+    .section-bc {
+      position: relative;
+      background-color: #232634;
+      padding: 0 0 clamp(10px, 1.25vw, 20px);  /* halved — divider sits closer */
+      margin-top: -20px;                       /* mobile: small pull-up under hero */
+    }
+
+    .bc-stage {
+      position: relative;
+      width: 100%;
+    }
+
+    .bloom-wrap {
+      position: relative;                   /* positioning context for the right-half pulse canvas */
+      width: 100vw;                         /* mobile: full-bleed across viewport */
+      max-width: 100vw;
+      aspect-ratio: 1 / 1;
+      margin-left: calc(50% - 50vw);
+      margin-right: calc(50% - 50vw);
+      background-color: #232634;
+      background-image: url('images/quantum_bloom_img.webp');
+      background-size: 135%;                /* zoom in so the bloom fills the frame */
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-blend-mode: screen;
+      /* Top-to-bottom mask: fades the wrapper's top 35% from transparent
+         up to fully opaque. Wherever the bloom-wrap's top edge falls
+         (against the hero's bottom or below), the seam dissolves smoothly
+         instead of showing a hard cropped image edge. */
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 35%, black 100%);
+              mask-image: linear-gradient(to bottom, transparent 0%, black 35%, black 100%);
+      /* Slow reveal — fades in + scales up when .in-view is added by the
+         dedicated bloom-wrap IntersectionObserver. No filter:blur (that was
+         the previous fps killer). The bloom-pulse canvas inside is held
+         off until the transform transitionend fires (see JS) so the GPU
+         isn't fighting an animating wrapper AND a live canvas. */
+      opacity: 0.1;
+      transform: scale(0.70);
+      transition:
+        opacity   1800ms cubic-bezier(.16, .84, .32, 1),
+        transform 1800ms cubic-bezier(.16, .84, .32, 1);
+      will-change: opacity, transform;
+    }
+    .bloom-wrap.in-view {
+      opacity: 1;
+      transform: scale(1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bloom-wrap {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+    }
+
+
+    /* Mobile: scale the bloom up to match the design reference. Image is
+       square (5700×5700) so to keep the previous 175% scale without
+       cropping the bright bloom shape, the wrapper is taller than wide.
+       Aspect 1/1.5 trims only the OUTER DARK-FADE margins of the image
+       (visually indistinguishable from the page bg) while preserving the
+       bright bloom-core fully — keeps the layout visually compact above
+       and below. */
+    @media (max-width: 767px) {
+      .bloom-wrap {
+        aspect-ratio: 1 / 1.5;          /* wrapper 100vw × 150vw */
+        background-size: 210%;          /* image renders 210vw × 210vw — cropped ~55vw each side */
+        /* Add side fades to the existing top-fade mask. At final scale the
+           wrapper edges sit at the viewport edges (invisible), but during
+           the reveal scale-up they sit inside the viewport — without these
+           fades the cropped image edge shows as a hard vertical line on
+           each side. mask-composite: intersect (= source-in for -webkit-)
+           multiplies the layer alphas so all three fades apply together. */
+        -webkit-mask-image:
+          linear-gradient(to bottom, transparent 0%, black 35%, black 100%),
+          linear-gradient(to right,  transparent 0%, black 8%,  black 92%, transparent 100%);
+                mask-image:
+          linear-gradient(to bottom, transparent 0%, black 35%, black 100%),
+          linear-gradient(to right,  transparent 0%, black 8%,  black 92%, transparent 100%);
+        -webkit-mask-composite: source-in;
+                mask-composite: intersect;
+      }
+    }
+
+    /* ===== BEGIN: bloom right-half pulse (CSS) =======================
+       Soft radial brightness pulse on the right half of the bloom — the
+       "alive with intelligence" heartbeat. To disable, delete this CSS
+       block, the matching <canvas id="bloomPulse"> in the HTML, and the
+       matching JS IIFE marked "bloom right-half pulse". */
+    .bloom-pulse {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+    /* ===== END: bloom right-half pulse (CSS) ========================= */
+
+    /* --- Mobile: caption + C-text both stack below the bloom --- */
+    .caption-block {
+      max-width: 380px;
+      margin-top: clamp(20px, 3vw, 36px);
+    }
+    @media (max-width: 767px) {
+      /* Pull the caption block UP so the white line + QUANTUM BLOOMS:
+         text overlap the lower fade region of the bloom image. Everything
+         below in the document flow shifts up by the same amount. */
+      .caption-block { margin-top: -100px; }
+    }
+
+    .caption-rule {
+      display: block;
+      position: relative;
+      /* Starts at 0; extends to its target width when .caption-block.in-view
+         is set by the reveal IntersectionObserver. */
+      width: 0;
+      height: 1px;
+      background: #FFFFFF;
+      margin-bottom: 16px;
+      transition: width 1120ms cubic-bezier(.16, .84, .32, 1);
+    }
+    .caption-rule::after {
+      content: "";
+      position: absolute;
+      right: -4px;
+      top: 50%;
+      width: 8px;
+      height: 8px;
+      background: #FFFFFF;
+      transform: translateY(-50%);
+    }
+    /* Mobile: line extends from the caption-block's left edge out to the
+       horizontal centre of the viewport — matches the desktop intent where
+       the line ends below the bloom's bright glow (which is also centred).
+       The offset matches the section container's mobile px-10 (40px) and
+       md:px-6 (24px) padding. */
+    .caption-block.in-view .caption-rule { width: calc(50vw - 40px); }
+    @media (min-width: 768px) {
+      .caption-block.in-view .caption-rule { width: calc(50vw - 24px); }
+    }
+
+    .caption-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      color: rgba(255, 255, 255, 0.78);
+      margin-bottom: 8px;
+    }
+
+    .caption-text {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      line-height: 1.7;
+      letter-spacing: 0.02em;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* Caption tag + body fade in AFTER the line has finished drawing. The
+       parent's generic .reveal-up fade-up is suppressed (see override below)
+       so the line + text orchestration is the only motion in this block. */
+    .caption-block .caption-tag,
+    .caption-block .caption-text {
+      opacity: 0;
+      transform: translateY(6px);
+      transition:
+        opacity 840ms cubic-bezier(.2, .7, .2, 1) 1050ms,
+        transform 840ms cubic-bezier(.2, .7, .2, 1) 1050ms;
+    }
+    .caption-block.in-view .caption-tag,
+    .caption-block.in-view .caption-text {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .caption-rule,
+      .caption-block .caption-tag,
+      .caption-block .caption-text {
+        transition: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+      }
+      /* Static fallback widths at rest — match the in-view targets per breakpoint. */
+      .caption-rule { width: calc(50vw - 40px) !important; }
+    }
+    @media (prefers-reduced-motion: reduce) and (min-width: 768px) {
+      .caption-rule { width: calc(50vw - 24px) !important; }
+    }
+    @media (prefers-reduced-motion: reduce) and (min-width: 1024px) {
+      /* Desktop static fallback — line stretches the full caption block. */
+      .caption-rule { width: 100% !important; }
+    }
+
+    .c-content {
+      margin-top: clamp(56px, 9vw, 100px);
+      max-width: 56ch;
+    }
+
+    /* --- Desktop: overlay both caption and C-content over the bloom --- */
+    @media (min-width: 1024px) {
+      /* Desktop: moderate pull-up so the bloom slides slightly under the
+         hero. The mask-image on .bloom-wrap fades its top 35% to handle
+         the actual seam smoothness. */
+      .section-bc {
+        margin-top: clamp(-220px, -14vw, -120px);
+      }
+      .bloom-wrap {
+        width: 100%;
+        max-width: 2732px;
+        margin-left: auto;
+        margin-right: auto;
+        background-size: 118%;
+        /* Slightly larger bg-size than before (was 108%) — extra 10% gives
+           the parallax controller vertical room to drift without exposing
+           the navy underneath. */
+        background-position: center calc(50% + var(--parallax-y, 0px));
+      }
+
+      .caption-tag  { font-size: 12px; }
+      .caption-text { font-size: 12px; }
+
+      .caption-block {
+        position: absolute;
+        left: 4%;
+        top: 58%;                          /* line sits below the bloom's bright glow */
+        width: 46%;                        /* line extends from caption to the centre of the stage */
+        max-width: none;
+        margin: 0;
+        z-index: 3;
+      }
+      /* On desktop the connector line stretches the full width of the
+         caption-block — its right end (with the white square) lands at
+         50% of the stage, directly below the bright glow of the bloom.
+         Targets .in-view so the line still draws out from 0 on scroll. */
+      .caption-block.in-view .caption-rule {
+        width: 100%;
+      }
+      /* Constrain only the text — the line stays long. */
+      .caption-block .caption-tag,
+      .caption-block .caption-text {
+        max-width: 360px;
+      }
+
+      /* C content sits with its LEFT EDGE at the centre of the stage,
+         overlapping the right-hand portion of the bloom — anchored to the
+         lower portion of the bloom to match the desktop design reference. */
+      .c-content {
+        position: absolute;
+        left: 50%;
+        /* Pushed down ~100px from the original 62% anchor so "We are"
+           lands on a darker patch of the bloom and reads more clearly. */
+        top: calc(62% + 100px);
+        margin: 0;
+        z-index: 3;
+        max-width: 50%;
+        padding-right: clamp(20px, 3vw, 56px);
+      }
+
+    }
+
+    /* ===========================
+       H2 + body copy (used inside the bc-stage)
+       =========================== */
+    .h2-display {
+      font-family: 'Noto Serif Display', serif;
+      font-weight: 300;                              /* Light */
+      font-size: 60px;
+      line-height: 1.04;
+      letter-spacing: -0.005em;
+      color: #FFFFFF;
+      margin-bottom: clamp(24px, 3vw, 40px);
+    }
+    .h2-display .h2-line { display: block; }
+
+    .body-copy { max-width: 56ch; }
+    .body-copy p {
+      font-family: 'Sora', sans-serif;
+      font-weight: 200;
+      font-size: clamp(16px, 1.45vw, 20px);
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.88);
+      margin-bottom: clamp(18px, 1.8vw, 26px);
+    }
+    .body-copy p:last-child { margin-bottom: 0; }
+    .body-copy p.body-fine {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.6);
+      max-width: 60ch;
+      margin-top: clamp(24px, 2.5vw, 36px);
+    }
+
+    /* Desktop-only type bumps for the "We are MatterMind" block.
+       Declared AFTER the base rules above so it wins the cascade at
+       equal specificity. body-fine matches the first two paragraphs
+       on desktop only — the colour difference (60% vs 88% white) keeps
+       it visually distinct without a size differential. */
+    @media (min-width: 1024px) {
+      .h2-display { font-size: 76px; }
+      .body-copy p.body-fine { font-size: clamp(16px, 1.45vw, 20px); }
+    }
+
+    /* ===========================
+       Section D — Divider / Horizon Layer
+       =========================== */
+    .section-d {
+      background-color: #232634;
+      padding: 0 0 clamp(20px, 3vw, 40px);
+      position: relative;
+    }
+
+    /* Mobile: add ~100px breathing room above and below the divider band.
+       Also cancels Section E's negative margin-top (which overlaps its
+       heading onto the divider on desktop) so mobile reads as clear,
+       separated bands instead. */
+    @media (max-width: 767px) {
+      .section-d {
+        padding-top: 100px;
+        padding-bottom: 100px;
+      }
+      .section-e { margin-top: 0; }
+    }
+
+    /* Stage holds the divider image (as a background) plus the M-mark and the
+       absolutely-positioned OBSERVATION / ACTION labels overlaid on the band.
+
+       Mobile/tablet: fixed-height wrap with `background-size: cover` — the
+       image is scaled so its full HEIGHT fills the container, then horizontally
+       cropped at the sides as needed. The visible band keeps a strong visual
+       presence on small screens instead of being scaled down to a thin strip.
+       Desktop: aspect-ratio matches the source 3000×1125 so the image fills
+       the viewport at full natural aspect with no crop. */
+    .divider-stage {
+      position: relative;
+      width: 100%;
+      height: clamp(240px, 32vw, 360px);
+      background-image: url('images/particle_divider.webp');
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      overflow: hidden;
+    }
+
+    @media (min-width: 1280px) {
+      .divider-stage {
+        height: auto;
+        aspect-ratio: 3000 / 1125;
+      }
+    }
+
+    /* ===== BEGIN: divider particle effect (CSS) =====================
+       To disable the effect entirely, delete this CSS block, the matching
+       <canvas id="dividerParticles"> in the HTML, and the matching
+       JS IIFE marked "divider particle effect". */
+    .divider-particles {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;            /* between bg image (0) and M-mark / labels (2) */
+      pointer-events: none;
+    }
+    /* ===== END: divider particle effect (CSS) ======================= */
+
+    /* M-mark dead centre on the divider band, both axes. */
+    .divider-mark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: clamp(32px, 3.2vw, 52px);
+      height: auto;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* Labels overlaid on the band. Each row is full-width and uses an
+       inner container so the label aligns with the page's content edge. */
+    .divider-label-row {
+      position: absolute;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+    /* OBSERVATION + ACTION labels start clustered on the divider's centre
+       line and smoothly ease apart to their final positions (top + bottom).
+       The .labels-spread class is applied by a dedicated IntersectionObserver
+       (threshold 1.0) that only fires once the divider is FULLY visible —
+       so the user sees the band fade in first, then the labels travel
+       outward. */
+    .divider-label-row-top {
+      top: 50%;                                 /* start: on the divider line */
+      transition: top 2000ms cubic-bezier(.16, .84, .32, 1);
+    }
+    .divider-label-row-bottom {
+      bottom: 50%;                              /* start: on the divider line */
+      transition: bottom 2000ms cubic-bezier(.16, .84, .32, 1);
+    }
+    .divider-stage.labels-spread .divider-label-row-top    { top: 6%; }
+    .divider-stage.labels-spread .divider-label-row-bottom { bottom: 6%; }
+    @media (prefers-reduced-motion: reduce) {
+      .divider-label-row-top    { top: 6%; transition: none; }
+      .divider-label-row-bottom { bottom: 6%; transition: none; }
+    }
+
+    .divider-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.22em;
+      color: rgba(255, 255, 255, 0.55);
+      margin: 0;
+    }
+
+    @media (min-width: 1024px) {
+      .divider-label { font-size: 10px; }
+    }
+
+    /* ===========================
+       Section E — Our intelligence
+       =========================== */
+    .section-e {
+      position: relative;                        /* establish stacking context */
+      z-index: 2;                                /* sit above the divider band */
+      background-color: transparent;             /* let the heading overlap the swirls */
+      padding: 0 0 clamp(80px, 10vw, 140px);
+      margin-top: clamp(-160px, -10vw, -60px);   /* heading sits over the particle swirls */
+    }
+
+    .intel-heading {
+      font-family: 'Noto Serif Display', serif;
+      font-weight: 300;
+      font-size: 60px;
+      line-height: 1.04;
+      letter-spacing: -0.005em;
+      color: #FFFFFF;
+      margin: 0 0 clamp(36px, 4.5vw, 64px) 0;
+    }
+    .intel-heading .h2-line { display: block; }
+
+    /* Grid: stacked on mobile, three columns on tablet+. Tight gap so the
+       diagonal slant on the panel illustrations reads as one continuous
+       line across all three cards. */
+    .intel-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: clamp(8px, 0.9vw, 14px);
+    }
+    /* Mobile: add an extra 10px of breathing room between the three stacked
+       cards on top of the base gap, so each card reads as a distinct unit. */
+    @media (max-width: 767px) {
+      .intel-grid { row-gap: calc(clamp(8px, 0.9vw, 14px) + 10px); }
+    }
+    @media (min-width: 768px) {
+      .intel-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    /* Card — translucent white panel with 20px corners. The illustration
+       sits flush at the bottom (no padding around it). */
+    .intel-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.10);
+      border-radius: 20px;
+      overflow: hidden;
+      min-height: clamp(300px, 30vw, 380px);
+
+      /* Reveal animation — staggered via --reveal-delay set by nth-child */
+      opacity: 0;
+      transform: translateY(28px) scale(0.97);
+      transition:
+        opacity   900ms cubic-bezier(.2,.7,.2,1) var(--reveal-delay, 0ms),
+        transform 900ms cubic-bezier(.2,.7,.2,1) var(--reveal-delay, 0ms);
+      will-change: opacity, transform;
+    }
+    /* Slower stagger between cards — each card waits ~400ms longer than the
+       previous before starting its fade-up. */
+    .intel-card:nth-child(1) { --reveal-delay: 200ms; }
+    .intel-card:nth-child(2) { --reveal-delay: 600ms; }
+    .intel-card:nth-child(3) { --reveal-delay: 1000ms; }
+
+    .intel-card.in-view {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* Inner wrapper holds the text content with its own padding, so the
+       illustration below can sit flush with the card edges. */
+    .intel-card-content {
+      padding: clamp(22px, 2.4vw, 32px);
+    }
+
+    .intel-card-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 20px;
+      letter-spacing: 0.18em;
+      color: #FFFFFF;
+      margin: 0 0 18px 0;
+    }
+
+    .intel-card-text {
+      font-family: 'Sora', sans-serif;
+      font-weight: 200;
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.75);
+      margin: 0;
+      max-width: 32ch;
+    }
+
+    /* Panel illustration — flush with card edges (no padding/gap), filled
+       with the design's solid #101224. */
+    .intel-card-icon {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin-top: auto;
+    }
+
+    @media (min-width: 1024px) {
+      .intel-card-text { font-size: 15px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .intel-card {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+      }
+    }
+
+    /* ===========================
+       Section F — Deep-tech band
+       =========================== */
+    .section-f {
+      background-color: #232634;
+      /* Mobile: tight top padding so the whole F+G unit fits a single viewport. */
+      padding: clamp(16px, 4vw, 32px) 0 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .deeptech-caption {
+      text-align: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(13px, 1vw, 16px);
+      letter-spacing: 0.2em;
+      color: rgba(255, 255, 255, 0.92);
+      /* Margin from viewport edge is handled by the section container. */
+      padding: 0;
+      margin: 0 0 clamp(-30px, -3vw, -14px) 0;
+      position: relative;
+      z-index: 2;
+      text-shadow: 0 0 12px rgba(35, 38, 52, 0.7);
+    }
+
+    /* Desktop: more generous spacing — caption sits above the wide bloom
+       with breathing room and only a slight overlap onto its top edge. */
+    @media (min-width: 1024px) {
+      .section-f {
+        padding: clamp(60px, 5vw, 100px) 0 0;
+      }
+      .deeptech-caption {
+        padding: 0;
+        margin: 0 0 clamp(-30px, -1.4vw, -16px) 0;
+      }
+    }
+
+    /* Each letter starts hidden and is revealed by a glitch keyframe.
+       JS wraps each word in a .glitch-word and each letter in a
+       .glitch-letter, with regular spaces (text nodes) between word
+       wrappers. The .glitch-word's white-space: nowrap blocks soft-wrap
+       opportunities between sibling .glitch-letter inline-blocks within
+       a word, so words like "physics" never split mid-character. */
+    .deeptech-caption .glitch-word {
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .deeptech-caption .glitch-letter {
+      display: inline-block;
+      white-space: pre;
+      opacity: 0;
+    }
+    .deeptech-caption.in-view .glitch-letter {
+      animation: letter-glitch 600ms cubic-bezier(.2,.6,.2,1) forwards;
+      animation-delay: var(--letter-delay, 0ms);
+    }
+
+    @keyframes letter-glitch {
+      0%   { opacity: 0;    transform: translate3d(-2px, 0, 0); color: #FFFFFF;
+             text-shadow: none; }
+      14%  { opacity: 0.45; transform: translate3d( 2px, 0, 0); color: rgba(229,115,102,0.95);
+             text-shadow: 0 0 14px rgba(229,115,102,0.45); }
+      26%  { opacity: 0.18; transform: translate3d(-1px, 0, 0); color: rgba(180,215,255,0.7);
+             text-shadow: 0 0 6px rgba(180,215,255,0.4); }
+      40%  { opacity: 0.7;  transform: translate3d( 1px, 0, 0); color: rgba(255,255,255,0.9);
+             text-shadow: 0 0 4px rgba(255,255,255,0.3); }
+      55%  { opacity: 0.4;  transform: translate3d( 0,    0, 0); color: rgba(229,115,102,0.55); }
+      72%  { opacity: 0.85; transform: translate3d( 0,    0, 0); color: rgba(255,255,255,0.95); }
+      100% { opacity: 1;    transform: translate3d( 0,    0, 0); color: #FFFFFF;
+             text-shadow: 0 0 8px rgba(255,255,255,0.22); }
+    }
+
+    /* Particle canvas overlay — radiating particles from the three circles
+       in the deep-tech bloom. Sits on top of the background image. */
+    .deeptech-particles {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Bloom band — single image (`deeptech_bloom.webp`) for both mobile
+       and desktop.
+       Mobile (<1024px): a fixed-height container with `background-size: cover`.
+       Because the image's natural aspect (1.764, landscape) is wider than the
+       container's aspect (close to square on a phone), `cover` scales the
+       image to fit the container HEIGHT — so the full vertical extent of the
+       image is preserved (top + bottom edges intact) and only the SIDES are
+       cropped. The viewer sees the centre bloom dominant.
+       Desktop (≥1024px): the full image at its natural aspect, no cropping. */
+    .deeptech-bloom-wrap {
+      width: 100%;
+      height: clamp(280px, 48vh, 420px);
+      background-image: url('images/deeptech_bloom.webp');
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (min-width: 1024px) {
+      .deeptech-bloom-wrap {
+        height: auto;
+        aspect-ratio: 3000 / 1701;
+        /* Slight overscale (was `cover` ≡ 100% at this exact aspect) gives
+           the parallax controller vertical room to drift. */
+        background-size: 112%;
+        background-position: center calc(50% + var(--parallax-y, 0px));
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .deeptech-caption .glitch-letter {
+        opacity: 1 !important;
+        animation: none !important;
+        transform: none !important;
+      }
+    }
+
+    /* ===========================
+       Section G — Philosophy statement
+       =========================== */
+    .section-g {
+      background-color: transparent;              /* let the image show through the overlap */
+      /* Mobile: tight bottom padding, moderate overlap into the bloom's
+         bottom fade — keeps the entire F+G group within one viewport. */
+      padding: 0 0 clamp(20px, 5vw, 40px);
+      margin-top: clamp(-60px, -6vw, -30px);
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Mobile: extra breathing room above the deep-tech caption and below
+       the philosophy statement, so each text block sits with clear empty
+       space rather than feeling pinched between the surrounding sections. */
+    @media (max-width: 767px) {
+      .section-f { padding-top: 120px; }
+      .section-g { padding-bottom: 120px; }
+    }
+
+    .philosophy {
+      text-align: center;
+      font-family: 'Noto Serif Display', serif;
+      font-weight: 300;
+      font-style: normal;
+      /* Mobile: ~30% smaller than the desktop max (52px × 0.7 ≈ 36px). */
+      font-size: clamp(28px, 7.5vw, 36px);
+      line-height: 1.1;
+      letter-spacing: -0.005em;
+      color: #FFFFFF;
+      max-width: 920px;
+      /* Margin from viewport edge is handled by the section container. */
+      padding: 0;
+      margin: 0 auto;
+      text-shadow: 0 0 16px rgba(35, 38, 52, 0.6);
+    }
+
+    /* Highlighted "key" words — italic + warm accent. */
+    .philosophy .key {
+      font-style: italic;
+      font-weight: 300;
+      color: #E57366;
+    }
+
+    /* ===========================
+       Section H — Footer / CTA
+       =========================== */
+    .section-h {
+      position: relative;
+      background-color: #232634;
+      padding: clamp(60px, 9vw, 140px) 0 0;
+      overflow: hidden;
+    }
+
+    /* Dark "floor" at the bottom of the section so the line-art image
+       dissolves into a colour close to its own bottom edge instead of
+       meeting the navy section bg with a visible seam. Sits BEHIND the
+       image (z-0 vs z-1), so the image still reads at 75% opacity on
+       top of it. On mobile the floor also fills the 90px image-lift gap
+       below the image so the locations + copyright text sit on the
+       darker floor instead of plain navy. */
+    .footer-floor {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: clamp(110px, 12vw, 200px);
+      background-color: #191A24;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Industrial line-art background image at the bottom of the section.
+       Tall enough to show the full skyline silhouette per the designs. */
+    .footer-bg {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: clamp(320px, 42vw, 620px);
+      background-image: url('images/footer_img_mono.webp');
+      background-size: cover;
+      /* Anchored to bottom; --parallax-y (set on desktop only) drifts it
+         vertically as the user scrolls into Section H. */
+      background-position: center calc(100% + var(--parallax-y, 0px));
+      background-repeat: no-repeat;
+      opacity: 0.75;
+      z-index: 1;
+      pointer-events: none;
+    }
+    /* Short top fade so the line-art dissolves into the section bg without
+       hiding the silhouette itself. */
+    .footer-bg::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom,
+        rgba(35, 38, 52, 1) 0%,
+        rgba(35, 38, 52, 0) 18%);
+      pointer-events: none;
+    }
+    /* Mobile: lift the line-art bg so its bottom edge sits above the
+       locations + copyright lines instead of running behind them, and
+       add a bottom-fade pseudo-element so the dark "ground" portion of
+       the image dissolves into the floor colour (#191A24) instead of
+       sitting as a hard dark band over the lighter floor. */
+    @media (max-width: 767px) {
+      .footer-bg { bottom: 90px; }
+      .footer-bg::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom,
+          rgba(25, 26, 36, 0) 75%,
+          rgba(25, 26, 36, 1) 100%);
+        pointer-events: none;
+      }
+    }
+
+    .footer-content {
+      position: relative;
+      z-index: 2;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: clamp(40px, 5vw, 80px);
+      padding-bottom: clamp(280px, 36vw, 520px);  /* leaves room for the taller line-art */
+    }
+    /* Mobile: extra breathing room between the invitation text ("Join us
+       on our journey") and the contact form below it. */
+    @media (max-width: 767px) {
+      .footer-grid { row-gap: 100px; }
+    }
+    @media (min-width: 1024px) {
+      .footer-grid {
+        grid-template-columns: 1fr 1.1fr;
+        gap: clamp(48px, 6vw, 100px);
+      }
+    }
+
+    .footer-col h3 {
+      font-family: 'Noto Serif Display', serif;
+      font-weight: 300;
+      font-size: 60px;
+      line-height: 1.04;
+      letter-spacing: -0.005em;
+      color: #FFFFFF;
+      margin: 0 0 clamp(20px, 2.5vw, 32px) 0;
+    }
+    .footer-col h3 .h2-line { display: block; }
+
+    /* Mobile-only heading downscale: .h1-display, .h2-display,
+       .intel-heading, and .footer-col h3 all drop to 48px below 768px.
+       Placed AFTER the base rules for all four so source order wins the
+       cascade (selectors are equal specificity; media queries don't add
+       any). For .h1-display this overrides the clamp() floor of 50px. */
+    @media (max-width: 767px) {
+      .h1-display,
+      .h2-display,
+      .intel-heading,
+      .footer-col h3 { font-size: 48px; }
+    }
+
+    .footer-col p {
+      font-family: 'Sora', sans-serif;
+      font-weight: 200;
+      font-size: clamp(15px, 1.18vw, 18px);
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.85);
+      max-width: 52ch;
+      margin: 0;
+    }
+
+    .footer-col a {
+      color: #E57366;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.2s ease;
+    }
+    .footer-col a:hover,
+    .footer-col a:focus { color: #FFA398; }
+
+    /* Contact form */
+    .contact-form {
+      display: flex;
+      flex-direction: column;
+      gap: clamp(22px, 2.2vw, 30px);
+      margin-top: clamp(24px, 3vw, 40px);
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      /* Each field starts hidden; .in-view (added by IO) plays the fade-up. */
+      opacity: 0;
+      transform: translateY(16px);
+      transition:
+        opacity   700ms cubic-bezier(.2,.6,.2,1) var(--field-delay, 0ms),
+        transform 700ms cubic-bezier(.2,.6,.2,1) var(--field-delay, 0ms);
+    }
+    .contact-form.in-view .form-field { opacity: 1; transform: translateY(0); }
+    /* First field also waits — none of the form animates instantly when the
+       20% threshold is hit. Each subsequent field follows with a 250ms gap. */
+    .form-field:nth-child(1) { --field-delay: 250ms; }
+    .form-field:nth-child(2) { --field-delay: 500ms; }
+    .form-field:nth-child(3) { --field-delay: 750ms; }
+    .form-field:nth-child(4) { --field-delay: 1000ms; }
+
+    /* Honeypot — must render so bots can find it, but invisible/unreachable
+       to humans. Off-screen positioning beats display:none (some bots skip
+       hidden fields). */
+    .form-honeypot {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Submission status message under the submit button. */
+    .form-status {
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      margin: 12px 0 0;
+      min-height: 1em;
+      text-align: right;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .form-status.is-success { color: #9DE3B0; }
+    .form-status.is-error { color: #FFA398; }
+
+    .form-field label {
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: none;
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      color: #FFFFFF;
+      font-family: 'Sora', sans-serif;
+      font-weight: 200;
+      font-size: 15px;
+      padding: 14px 16px;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.2s ease, background 0.2s ease;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .form-field input:focus,
+    .form-field select:focus,
+    .form-field textarea:focus {
+      border-color: rgba(229, 115, 102, 0.7);
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .form-field input::placeholder,
+    .form-field textarea::placeholder {
+      color: rgba(255, 255, 255, 0.35);
+    }
+    .form-field textarea {
+      resize: vertical;
+      min-height: 88px;
+      font-family: 'Sora', sans-serif;
+    }
+
+    /* Custom chevron on the dropdown */
+    .form-field select {
+      cursor: pointer;
+      background-image:
+        linear-gradient(45deg, transparent 50%, rgba(255,255,255,0.5) 50%),
+        linear-gradient(135deg, rgba(255,255,255,0.5) 50%, transparent 50%);
+      background-position:
+        calc(100% - 18px) calc(50% - 2px),
+        calc(100% - 13px) calc(50% - 2px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      padding-right: 36px;
+    }
+    .form-field select option { background: #232634; color: #FFFFFF; }
+
+    /* Submit button */
+    .form-submit {
+      align-self: flex-end;
+      margin-top: clamp(12px, 1.5vw, 20px);
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+      padding: 13px 32px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 4px;
+      background: transparent;
+      color: #FFFFFF;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(16px);
+      transition:
+        opacity      700ms cubic-bezier(.2,.6,.2,1) 1250ms,
+        transform    700ms cubic-bezier(.2,.6,.2,1) 1250ms,
+        border-color 0.25s ease,
+        color        0.25s ease,
+        box-shadow   0.25s ease;
+    }
+    .contact-form.in-view .form-submit { opacity: 1; transform: translateY(0); }
+    .form-submit:hover,
+    .form-submit:focus {
+      border-color: #E57366;
+      color: #E57366;
+      box-shadow: 0 0 22px rgba(229, 115, 102, 0.25);
+    }
+
+    .footer-locations {
+      position: relative;
+      z-index: 3;
+      text-align: center;
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.85);
+      white-space: nowrap;
+      margin: 0;
+      padding-top: clamp(8px, 1vw, 14px);
+    }
+
+    .footer-copyright {
+      position: relative;
+      z-index: 3;
+      text-align: center;
+      font-family: 'Sora', sans-serif;
+      font-weight: 300;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.4);
+      margin: 0;
+      padding: clamp(4px, 0.5vw, 8px) 0 clamp(24px, 3vw, 40px);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .form-field, .form-submit {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, background 0.2s ease !important;
+      }
+    }
+
+    /* Word-by-word reveal for the philosophy statement. JS wraps each word
+       in a .phil-word span and sets --word-delay; the .in-view class is
+       added by an IntersectionObserver when the section enters the viewport. */
+    .philosophy .phil-word {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(8px);
+      white-space: pre;
+    }
+    .philosophy.in-view .phil-word {
+      animation: phil-word-fade 700ms cubic-bezier(.2,.6,.2,1) forwards;
+      animation-delay: var(--word-delay, 0ms);
+    }
+    @keyframes phil-word-fade {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .philosophy .phil-word {
+        opacity: 1 !important;
+        transform: none !important;
+        animation: none !important;
+      }
+    }
+
+    /* Desktop: philosophy is pulled up significantly so it visibly overlaps
+       the bottom edge of the wide bloom — the user sees both image and
+       philosophy in the same scroll position. */
+    @media (min-width: 1024px) {
+      .section-g {
+        padding: 0 0 clamp(80px, 8vw, 140px);
+        margin-top: clamp(-180px, -10vw, -90px);
+      }
+      .philosophy {
+        padding: 0;
+        font-size: clamp(38px, 4vw, 52px);
+      }
+    }
+
+    /* Generic scroll-triggered fade-up reveal — used for Sections B/C/D
+       (caption block, "We are MatterMind" content, and divider stage).
+       Each element opts in by adding the .reveal-up class; an IntersectionObserver
+       in JS adds .in-view when it enters the viewport. Optional per-element
+       stagger via --reveal-delay. Matches the Section E/G motion language. */
+    .reveal-up {
+      opacity: 0;
+      transform: translateY(18px);
+      transition:
+        opacity 900ms cubic-bezier(.2, .6, .2, 1),
+        transform 900ms cubic-bezier(.2, .6, .2, 1);
+      transition-delay: var(--reveal-delay, 0ms);
+      will-change: opacity, transform;
+    }
+    .reveal-up.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal-up {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-mm-bg text-mm-text">
+
+  <!-- =========================================
+       HERO SECTION
+       ========================================= -->
+  <section class="hero" data-parallax="0.18">
+
+    <!-- Top blue gradient overlay (#446D9F 100% -> 0%) -->
+    <div class="hero-gradient" aria-hidden="true"></div>
+
+    <!-- Particle emission canvas — sits between image and content -->
+    <canvas id="particleCanvas" class="hero-particles" aria-hidden="true"></canvas>
+
+    <!-- Bottom fade into page background -->
+    <div class="hero-fade" aria-hidden="true"></div>
+
+    <!-- HERO CONTENT -->
+    <div class="hero-content">
+
+      <!-- ========== NAVBAR ========== -->
+      <header class="w-full">
+        <nav class="relative max-w-[1440px] mx-auto px-10 md:px-10 lg:px-14 py-6 md:py-7 flex items-center justify-between">
+
+          <!-- Wordmark / Logo -->
+          <a href="#" class="flex items-center" aria-label="MatterMind home">
+            <img src="images/mm_logo.svg" alt="MatterMind" class="wordmark" decoding="async" />
+          </a>
+
+          <!-- Desktop Nav — absolutely centred on the viewport so 'Intelligence' aligns with the M-mark below -->
+          <ul class="hidden md:flex items-center gap-8 lg:gap-12 nav-list absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <li><a href="#vision" class="nav-link">Vision</a></li>
+            <li><a href="#intelligence" class="nav-link">Intelligence</a></li>
+            <li><a href="#join" class="nav-link">Join Us</a></li>
+          </ul>
+
+          <!-- Desktop CTA -->
+          <a href="#contact" class="btn-cta hidden md:inline-block">Get in touch</a>
+
+          <!-- Mobile menu trigger -->
+          <button id="menuBtn" class="md:hidden menu-icon" aria-label="Open menu" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
+        </nav>
+
+        <!-- Mobile Nav Drawer — full-screen overlay when open. -->
+        <div id="mobileNav" class="md:hidden">
+          <ul>
+            <li><a href="#vision" class="nav-link">Vision</a></li>
+            <li><a href="#intelligence" class="nav-link">Intelligence</a></li>
+            <li><a href="#join" class="nav-link">Join Us</a></li>
+            <li><a href="#contact" class="nav-link">Get in touch</a></li>
+          </ul>
+        </div>
+      </header>
+
+      <!-- Center M-mark — absolutely centred on the hero (sits at the bloom centre) -->
+      <img src="images/mm_indent.png" alt="" class="mark" decoding="async" fetchpriority="high" />
+
+      <!-- Hero text block — always presents underneath the M-mark -->
+      <div class="hero-text">
+        <h1 class="h1-display">
+          <span class="word">Fusing</span>
+          <span class="word">intelligence</span>
+          <span class="word">into</span>
+          <span class="word">the</span>
+          <span class="italic-line"><span class="word">foundations</span> <span class="word">of</span> <span class="word">reality.</span></span>
+        </h1>
+        <p class="intro-text mt-5 md:mt-6 mx-auto max-w-[34ch] lg:max-w-none lg:whitespace-nowrap">
+          Bringing perception, reasoning, and autonomy into the systems that shape the physical world.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SECTION B + C — Quantum Bloom + "We are MatterMind"
+       Combined stage so caption overlays the bloom on the left and
+       the C content overlays it on the right (desktop). They stack on mobile.
+       ========================================= -->
+  <section class="section-bc">
+    <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
+      <div class="bc-stage">
+
+        <!-- Bloom -->
+        <div class="bloom-wrap" role="img" aria-label="Quantum bloom — pixelated energy on the left refining into high-resolution intelligence on the right" data-parallax="0.08">
+          <!-- BEGIN: bloom right-half pulse (HTML) — remove this canvas to disable -->
+          <canvas id="bloomPulse" class="bloom-pulse" aria-hidden="true"></canvas>
+          <!-- END: bloom right-half pulse (HTML) -->
+        </div>
+
+        <!-- Caption — overlays bloom on the left (desktop), stacks below (mobile). -->
+        <div class="caption-block">
+          <span class="caption-rule" aria-hidden="true"></span>
+          <p class="caption-tag">QUANTUM BLOOMS:</p>
+          <p class="caption-text">
+            Intelligence awakens where none was before &mdash; Luminous, intricate patterns unfurling from a swirling, almost primordial energy, suggesting perception, knowledge and reasoning coalescing from the fundamental.
+          </p>
+        </div>
+
+        <!-- We are MatterMind — overlays bloom on the right (desktop), stacks below (mobile) -->
+        <!-- id="vision" sits on .c-content so the "Vision" nav link
+             scrolls the user to the "We are MatterMind" header. -->
+        <div id="vision" class="c-content reveal-up" style="--reveal-delay: 150ms;">
+          <h2 class="h2-display">
+            <span class="h2-line">We are</span>
+            <span class="h2-line">MatterMind</span>
+          </h2>
+          <div class="body-copy">
+            <p>We are building intelligence embedded within physical matter systems that perceive cause and effect, learn from it, and continuously evolve to shape better realities.</p>
+            <p>We are reframing intelligence into the fundamental properties of the universe to change how we understand what it means to think, learn, and exist.</p>
+            <p class="body-fine">Physical systems generate vast signals. They still rely on static rules and human judgement under pressure. MatterMind provides a disciplined layer between observation and action.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SECTION D — Divider / Horizon Layer
+       ========================================= -->
+  <section class="section-d">
+    <div class="divider-stage reveal-up" role="img" aria-label="Horizon divider">
+      <!-- BEGIN: divider particle effect (HTML) — remove this canvas to disable -->
+      <canvas id="dividerParticles" class="divider-particles" aria-hidden="true"></canvas>
+      <!-- END: divider particle effect (HTML) -->
+
+      <img src="images/mm_indent_small_grey.svg" alt="" class="divider-mark" aria-hidden="true" loading="lazy" decoding="async" />
+
+      <div class="divider-label-row divider-label-row-top">
+        <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
+          <p class="divider-label">OBSERVATION</p>
+        </div>
+      </div>
+      <div class="divider-label-row divider-label-row-bottom">
+        <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
+          <p class="divider-label">ACTION</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SECTION E — Our intelligence
+       ========================================= -->
+  <section id="intelligence" class="section-e">
+    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+      <h2 class="intel-heading">
+        <span class="h2-line">Our</span>
+        <span class="h2-line">intelligence&hellip;</span>
+      </h2>
+
+      <div class="intel-grid">
+        <article class="intel-card">
+          <div class="intel-card-content">
+            <p class="intel-card-tag">UNDERSTANDS</p>
+            <p class="intel-card-text">Executes bounded interventions with auditability, permissioning, and human control.</p>
+          </div>
+          <img src="images/panel1_img.svg" alt="" class="intel-card-icon" aria-hidden="true" loading="lazy" decoding="async" />
+        </article>
+
+        <article class="intel-card">
+          <div class="intel-card-content">
+            <p class="intel-card-tag">REASONS</p>
+            <p class="intel-card-text">Evaluates options, forecasts outcomes, and validates decisions before change.</p>
+          </div>
+          <img src="images/panel2_img.svg" alt="" class="intel-card-icon" aria-hidden="true" loading="lazy" decoding="async" />
+        </article>
+
+        <article class="intel-card">
+          <div class="intel-card-content">
+            <p class="intel-card-tag">ACTS SAFELY</p>
+            <p class="intel-card-text">Our intelligence maintains a structured model of assets, states, constraints, and dependencies.</p>
+          </div>
+          <img src="images/panel3_img.svg" alt="" class="intel-card-icon" aria-hidden="true" loading="lazy" decoding="async" />
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SECTION F — Deep-tech band
+       ========================================= -->
+  <section class="section-f">
+    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+      <p class="deeptech-caption">MatterMind is an R&amp;D lab building physics aware AI systems.</p>
+    </div>
+    <div class="deeptech-bloom-wrap" aria-hidden="true" data-parallax="0.05">
+      <canvas id="deeptechParticles" class="deeptech-particles"></canvas>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SECTION G — Philosophy statement
+       ========================================= -->
+  <section class="section-g">
+    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+      <p class="philosophy">
+        <em class="key">Correctness</em> before growth. <em class="key">Simulation</em> before action. <em class="key">Trust</em> before autonomy.
+      </p>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SECTION H — Footer / CTA
+       ========================================= -->
+  <section id="join" class="section-h">
+    <!-- Industrial line-art background sits at the bottom of the section. -->
+    <div class="footer-floor" aria-hidden="true"></div>
+    <div class="footer-bg" aria-hidden="true" data-parallax="0.10"></div>
+
+    <div class="footer-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+      <div class="footer-grid">
+
+        <!-- Left column — invitation -->
+        <div class="footer-col">
+          <h3>
+            <span class="h2-line">Architects of</span>
+            <span class="h2-line">a new reality</span>
+          </h3>
+          <p>
+            We are seeking individuals who possess the rare combination of technical mastery combined with physical curiosity. <a href="mailto:support@mattermind.ai">Join us</a> on our journey.
+          </p>
+        </div>
+
+        <!-- Right column — contact form -->
+        <div class="footer-col" id="contact">
+          <h3>Get in touch</h3>
+          <p>Inquire about partnerships, research collaborations or investment.</p>
+
+          <!--
+            CONTACT FORM
+            ============
+            The `action` attribute below is a placeholder. To wire this form
+            up to a backend service, replace it with your endpoint URL.
+            Recommended providers (no server-side code required):
+              • Formspree:      action="https://formspree.io/f/YOUR_FORM_ID"
+              • Netlify Forms:  add `data-netlify="true"` and host on Netlify
+              • Custom API:     point `action` at your POST endpoint
+            All fields use semantic `name` attributes so the submitted payload
+            is easy to consume on the receiving end.
+          -->
+          <form class="contact-form" id="contactForm" action="https://formspree.io/f/mzdodajb" method="POST" novalidate>
+
+            <div class="form-field">
+              <label for="form-name">Name</label>
+              <input type="text" id="form-name" name="name" autocomplete="name" required />
+            </div>
+
+            <div class="form-field">
+              <label for="form-email">Email</label>
+              <input type="email" id="form-email" name="email" autocomplete="email" required />
+            </div>
+
+            <div class="form-field">
+              <label for="form-inquiry">Inquiry type</label>
+              <select id="form-inquiry" name="inquiry_type" required>
+                <option value="partnerships">Partnerships</option>
+                <option value="research">Research</option>
+                <option value="investment">Investment</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="form-thoughts">Thoughts</label>
+              <textarea id="form-thoughts" name="thoughts" rows="3" placeholder="Describe your vision"></textarea>
+            </div>
+
+            <input class="form-honeypot" type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" />
+            <input type="hidden" name="_subject" value="New MatterMind inquiry" />
+
+            <button type="submit" class="form-submit">Send transmission</button>
+            <p class="form-status" id="formStatus" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+
+      </div>
+
+      <p class="footer-locations">New York&nbsp;|&nbsp;London&nbsp;|&nbsp;Bangalore</p>
+      <p class="footer-copyright">© 2026 MatterMind Inc.</p>
+    </div>
+  </section>
+
+  <!-- =========================================
+       Scripts
+       ========================================= -->
+  <script>
+    // Mobile nav toggle — full-screen overlay drawer.
+    (function () {
+      const btn = document.getElementById('menuBtn');
+      const nav = document.getElementById('mobileNav');
+      if (!btn || !nav) return;
+
+      function setOpen(open) {
+        nav.classList.toggle('is-open', open);
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        // Lock background scroll while the overlay is up.
+        document.body.style.overflow = open ? 'hidden' : '';
+      }
+
+      btn.addEventListener('click', () => {
+        const open = !nav.classList.contains('is-open');   // currently closed → opening
+        setOpen(open);
+      });
+
+      // Tap anywhere inside the overlay (including a link) closes it.
+      // Links still navigate first via their default behavior.
+      nav.addEventListener('click', () => setOpen(false));
+
+      // Escape key also closes.
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && nav.classList.contains('is-open')) setOpen(false);
+      });
+    })();
+
+    // Stagger the headline word reveal
+    (function () {
+      const words = document.querySelectorAll('.h1-display .word');
+      words.forEach((w, i) => {
+        w.style.animationDelay = (700 + i * 130) + 'ms';
+      });
+    })();
+
+    // Section E — reveal the three intelligence cards in sequence when the
+    // section scrolls into view. Stagger is handled in CSS via :nth-child.
+    (function () {
+      const section = document.querySelector('.section-e');
+      if (!section) return;
+      const cards = section.querySelectorAll('.intel-card');
+      if (!cards.length) return;
+      // Fall back to immediate reveal if IntersectionObserver isn't supported.
+      if (!('IntersectionObserver' in window)) {
+        cards.forEach(c => c.classList.add('in-view'));
+        return;
+      }
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            cards.forEach(c => c.classList.add('in-view'));
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.35, rootMargin: '0px 0px -80px 0px' });
+      observer.observe(section);
+    })();
+
+    // Section F — glitch reveal: split the caption into per-character spans
+    // and stagger their illuminate-to-life animation when scrolled into view.
+    (function () {
+      const caption = document.querySelector('.deeptech-caption');
+      if (!caption) return;
+
+      // Split into words so each word can be wrapped in a non-breaking
+      // .glitch-word — without this, every .glitch-letter inline-block
+      // creates a soft-wrap opportunity and words can split mid-character.
+      const words = caption.textContent.split(' ');
+      caption.textContent = '';
+      let letterIdx = 0;
+      words.forEach((word, wi) => {
+        if (wi > 0) caption.appendChild(document.createTextNode(' '));
+        const wordWrap = document.createElement('span');
+        wordWrap.className = 'glitch-word';
+        for (let i = 0; i < word.length; i++) {
+          const span = document.createElement('span');
+          span.className = 'glitch-letter';
+          span.textContent = word[i];
+          span.style.setProperty('--letter-delay', (letterIdx * 50) + 'ms');
+          wordWrap.appendChild(span);
+          letterIdx++;
+        }
+        caption.appendChild(wordWrap);
+      });
+
+      if (!('IntersectionObserver' in window)) {
+        caption.classList.add('in-view');
+        return;
+      }
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            caption.classList.add('in-view');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.5 });
+      observer.observe(caption);
+    })();
+
+    // Section G — philosophy: wrap each word in a .phil-word span and stagger
+    // a fade-up animation when the user scrolls and the deep-tech band
+    // (caption + image) is visible on screen.
+    (function () {
+      const philosophy = document.querySelector('.philosophy');
+      if (!philosophy) return;
+
+      // Walk the existing children and wrap each word (and each <em class="key">
+      // element) in its own .phil-word span. Whitespace between words is preserved.
+      const original = Array.from(philosophy.childNodes);
+      philosophy.textContent = '';
+      original.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const tokens = node.textContent.split(/(\s+)/);
+          tokens.forEach(tok => {
+            if (!tok.length) return;
+            if (/^\s+$/.test(tok)) {
+              philosophy.appendChild(document.createTextNode(tok));
+            } else {
+              const span = document.createElement('span');
+              span.className = 'phil-word';
+              span.textContent = tok;
+              philosophy.appendChild(span);
+            }
+          });
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          // Wrap the element (e.g. <em class="key">) in a .phil-word span.
+          const span = document.createElement('span');
+          span.className = 'phil-word';
+          span.appendChild(node);
+          philosophy.appendChild(span);
+        }
+      });
+
+      // Stagger animation delays — 130ms per word.
+      const words = philosophy.querySelectorAll('.phil-word');
+      words.forEach((w, i) => {
+        w.style.setProperty('--word-delay', (i * 130) + 'ms');
+      });
+
+      if (!('IntersectionObserver' in window)) {
+        philosophy.classList.add('in-view');
+        return;
+      }
+
+      // Trigger the reveal when the philosophy itself is just starting to
+      // enter the viewport — that way the user actually witnesses the
+      // word-by-word fade as they scroll the line into view, rather than
+      // it firing before they get there.
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            philosophy.classList.add('in-view');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.25 });
+      observer.observe(philosophy);
+    })();
+
+    // Section H — staggered fade-up reveal of the form fields when the
+    // contact form scrolls into view. Per-field delay is set in CSS via
+    // :nth-child; the .in-view class is added once on intersection.
+    (function () {
+      const form = document.querySelector('.contact-form');
+      if (!form) return;
+      if (!('IntersectionObserver' in window)) {
+        form.classList.add('in-view');
+        return;
+      }
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            form.classList.add('in-view');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.2 });
+      observer.observe(form);
+    })();
+
+    // AJAX submit to Formspree — keeps the user on the page and shows an
+    // inline status message instead of redirecting to formspree.io.
+    (function () {
+      const form = document.getElementById('contactForm');
+      const status = document.getElementById('formStatus');
+      const submit = form && form.querySelector('.form-submit');
+      if (!form || !status || !submit) return;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        status.classList.remove('is-success', 'is-error');
+        status.textContent = 'Sending…';
+        submit.disabled = true;
+
+        try {
+          const res = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'Accept': 'application/json' },
+          });
+          if (res.ok) {
+            status.textContent = 'Transmission received. We’ll be in touch.';
+            status.classList.add('is-success');
+            form.reset();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            const msg = (data.errors && data.errors[0] && data.errors[0].message)
+              || 'Something went wrong. Please try again.';
+            status.textContent = msg;
+            status.classList.add('is-error');
+            submit.disabled = false;
+          }
+        } catch (err) {
+          status.textContent = 'Network error. Please try again.';
+          status.classList.add('is-error');
+          submit.disabled = false;
+        }
+      });
+    })();
+
+    // Section F — radiating particles from the three circles in the deep-tech
+    // bloom. Same lightweight pattern as the hero canvas: 30fps cap, additive
+    // blending inside the canvas (no mix-blend-mode), DPR cap at 1.5,
+    // halo+core two-pass draw, and a hard pause via IntersectionObserver so
+    // the rAF only runs while the bloom is on screen.
+    (function () {
+      const canvas = document.getElementById('deeptechParticles');
+      if (!canvas) return;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) return;
+
+      const ctx = canvas.getContext('2d');
+      const particles = [];
+      const MAX = 110;
+      const FRAME_MS = 1000 / 24;        // ambient effect — 24fps is plenty
+      let W = 0, H = 0;
+      let last = 0;
+      let running = false;
+      let rafId = 0;
+
+      // Emitter positions + ring radius are recomputed on resize so the
+      // particles spawn around the visible rings at any breakpoint. Each
+      // emitter has a rotation direction so adjacent rings spin opposite
+      // ways for visual variety.
+      let EMITTERS = [];
+      let sizeScale = 1.0;     // particles scale down on smaller viewports
+      function computeEmitters() {
+        const isWide = window.innerWidth >= 1024;
+        const xs    = isWide ? [0.25, 0.50, 0.75] : [0.10, 0.50, 0.90];
+        const ringR = isWide ? 0.095 : 0.13;
+        sizeScale   = isWide ? 1.0 : 0.62;
+        EMITTERS = [
+          { x: xs[0], y: 0.50, r: 255, g: 200, b: 178, dir:  1, ringR: ringR },
+          { x: xs[1], y: 0.50, r: 210, g: 225, b: 255, dir: -1, ringR: ringR },
+          { x: xs[2], y: 0.50, r: 255, g: 200, b: 178, dir:  1, ringR: ringR },
+        ];
+      }
+
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+        const cssW = canvas.offsetWidth;
+        const cssH = canvas.offsetHeight;
+        canvas.width = Math.max(1, cssW * dpr);
+        canvas.height = Math.max(1, cssH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalCompositeOperation = 'lighter';
+        W = cssW; H = cssH;
+        computeEmitters();
+      }
+
+      // Particles are stored in polar coordinates (angle, radius) relative to
+      // their emitter centre. Each frame angle += angularVel and radius +=
+      // radialVel — combined this traces a spiral outward, which is much
+      // cheaper than recomputing tangent/radial directions with atan2.
+      function spawn() {
+        const e = EMITTERS[Math.floor(Math.random() * EMITTERS.length)];
+        const ex = e.x * W;
+        const ey = e.y * H;
+        const ringRadius = e.ringR * W;
+        const startAngle = Math.random() * Math.PI * 2;
+        // Slowed another 20% — calmer, more elegant drift.
+        const angularVel = e.dir * (0.014 + Math.random() * 0.018);
+        const radialVel  = (0.55 + Math.random() * 1.05) * sizeScale;
+        // Trail length proportional to the ring so it scales with viewport.
+        const trail = ringRadius * (0.6 + Math.random() * 1.0);
+        particles.push({
+          sx: ex, sy: ey,
+          angle: startAngle,
+          radius: ringRadius + (Math.random() - 0.5) * 8 * sizeScale,
+          angularVel: angularVel,
+          radialVel:  radialVel,
+          startRadius: ringRadius,
+          maxRadius: ringRadius + trail,
+          // Particle size scales with viewport — smaller on mobile so the
+          // dots don't read oversized against the smaller canvas.
+          size: (0.8 + Math.random() * 1.35) * sizeScale,
+          r: e.r, g: e.g, b: e.b,
+        });
+      }
+
+      function tick(now) {
+        if (!running) return;
+        if (now - last >= FRAME_MS) {
+          last = now;
+          ctx.clearRect(0, 0, W, H);
+          if (particles.length < MAX && Math.random() < 0.7) {
+            spawn();
+            if (particles.length < 60) spawn();
+          }
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.angle  += p.angularVel;
+            p.radius += p.radialVel;
+            if (p.radius >= p.maxRadius) { particles.splice(i, 1); continue; }
+
+            const x = p.sx + Math.cos(p.angle) * p.radius;
+            const y = p.sy + Math.sin(p.angle) * p.radius;
+
+            // Fade based on how far the particle has travelled from the ring
+            // (startRadius) to its maxRadius.
+            const travel = (p.radius - p.startRadius) / (p.maxRadius - p.startRadius);
+            let a;
+            if (travel < 0.15) {
+              const u = travel / 0.15;
+              a = u * (2 - u);
+            } else {
+              a = 1 - (travel - 0.15) / 0.85;
+            }
+            // Peak alpha 0.80 — ~15% less prominent than the previous 0.95.
+            a *= 0.80;
+
+            const rgb = p.r + ',' + p.g + ',' + p.b + ',';
+            // Three-pass draw — outer soft halo + inner halo + bright core —
+            // gives a graduated falloff so the particle edges read soft
+            // rather than as a hard halo ring.
+            ctx.fillStyle = 'rgba(' + rgb + (a * 0.10) + ')';
+            ctx.beginPath();
+            ctx.arc(x, y, p.size * 5.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(' + rgb + (a * 0.22) + ')';
+            ctx.beginPath();
+            ctx.arc(x, y, p.size * 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(' + rgb + a + ')';
+            ctx.beginPath();
+            ctx.arc(x, y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function start() {
+        if (running) return;
+        running = true;
+        last = 0;
+        rafId = requestAnimationFrame(tick);
+      }
+      function stop() {
+        running = false;
+        if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      const ioTarget = canvas.parentElement || canvas;
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) start();
+          else                     stop();
+        });
+      }, { threshold: 0.05 });
+      observer.observe(ioTarget);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) stop();
+      });
+    })();
+
+    // Particle emission from the bloom centre
+    (function () {
+      const canvas = document.getElementById('particleCanvas');
+      if (!canvas) return;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) return;
+
+      const ctx = canvas.getContext('2d');
+      const particles = [];
+      // Mobile gets ~35% fewer particles than desktop (120 → 78).
+      const MAX = window.innerWidth >= 768 ? 120 : 78;
+      // Initial double-spawn threshold — scaled with MAX so the relative
+      // fill cadence stays consistent across viewports (was hardcoded 76).
+      const FILL_TO = Math.round(MAX * 0.633);
+      const FRAME_MS = 1000 / 24;   // throttle to ~24fps — gentler on GPU
+      let W = 0, H = 0;
+      let last = 0;
+      let running = true;
+      // Vertical centre of the emission strip as a fraction of canvas height.
+      // Mobile shifts this up to match the raised bloom + M-mark.
+      let emitYRatio = 0.5;
+
+      function resize() {
+        // Cap DPR — sub-2px particles look fine at 1x even on retina, and
+        // every step up squares the pixel count for clearRect / arc fills.
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.0);
+        const cssW = canvas.offsetWidth;
+        const cssH = canvas.offsetHeight;
+        canvas.width = Math.max(1, cssW * dpr);
+        canvas.height = Math.max(1, cssH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalCompositeOperation = 'lighter';
+        W = cssW; H = cssH;
+        emitYRatio = window.innerWidth >= 768 ? 0.5 : 0.32;
+      }
+
+      function spawn() {
+        // Emit across the bright horizontal band of the bloom — ~45px tall.
+        const x = W * (0.10 + Math.random() * 0.80);
+        const y = H * emitYRatio + (Math.random() - 0.5) * 45;
+        // Colour follows position — blue on the left half, coral on the right.
+        const isBlue = x < W / 2;
+        // Random path in any direction so particles drift above and below the strip.
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.55 + Math.random() * 1.05;
+        particles.push({
+          x: x, y: y,
+          sx: x, sy: y,                              // spawn point — used for distance fade
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          maxDist: 140 + Math.random() * 160,
+          size: 0.7 + Math.random() * 1.0,
+          r: isBlue ? 180 : 255,
+          g: isBlue ? 215 : 200,
+          b: isBlue ? 255 : 185,
+        });
+      }
+
+      // Alpha curve: rises smoothly from 0 → 1 over the first ~18% of travel
+      // (elegant fade-in instead of a hard pop), then eases back to 0.
+      const FADE_IN_END = 0.18;
+      const FADE_OUT_RANGE = 1 - FADE_IN_END;
+
+      function tick(now) {
+        if (!running) return;
+        if (now - last >= FRAME_MS) {
+          last = now;
+          ctx.clearRect(0, 0, W, H);
+          if (particles.length < MAX && Math.random() < 0.75) {
+            spawn();
+            if (particles.length < FILL_TO) spawn();   // double-spawn while filling
+          }
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            const dx = p.x - p.sx;
+            const dy = p.y - p.sy;
+            const distSq = dx * dx + dy * dy;
+            const maxSq = p.maxDist * p.maxDist;
+            if (distSq >= maxSq) { particles.splice(i, 1); continue; }
+            const t = distSq / maxSq;
+            // Smooth fade-in (quadratic ease-out) then linear fade-out.
+            let a;
+            if (t < FADE_IN_END) {
+              const u = t / FADE_IN_END;
+              a = u * (2 - u);                       // ease-out: rises fast, settles smoothly
+            } else {
+              a = 1 - (t - FADE_IN_END) / FADE_OUT_RANGE;
+            }
+            a *= 1.0;
+            const rgb = p.r + ',' + p.g + ',' + p.b + ',';
+            // Soft halo pass — 3x radius, low alpha.
+            ctx.fillStyle = 'rgba(' + rgb + (a * 0.28) + ')';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
+            ctx.fill();
+            // Bright core pass.
+            ctx.fillStyle = 'rgba(' + rgb + a + ')';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      // Pause the loop when the tab is hidden — saves battery and avoids
+      // a frame-rush when the user returns.
+      let started = false;
+      let tabHidden = false;
+      let onScreen = true;
+
+      function maybeRun() {
+        if (!started || tabHidden || !onScreen) {
+          running = false;
+          return;
+        }
+        if (!running) {
+          running = true;
+          last = 0;
+          requestAnimationFrame(tick);
+        }
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        tabHidden = document.hidden;
+        maybeRun();
+      });
+
+      // Pause the loop while the hero is off-screen — previously the canvas
+      // kept ticking at 30fps for the entire scroll of the page, which was
+      // a major fps drain.
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(e => {
+            onScreen = e.isIntersecting;
+            maybeRun();
+          });
+        }, { threshold: 0 });
+        io.observe(canvas);
+      }
+
+      started = true;
+      requestAnimationFrame(tick);
+    })();
+
+    // Sections B / C / D — generic fade-up reveal on scroll. Any element with
+    // .reveal-up gets .in-view added when it enters the viewport. Per-element
+    // delay can be set via inline `--reveal-delay` (see .c-content above).
+    (function () {
+      const items = document.querySelectorAll('.reveal-up');
+      if (!items.length) return;
+      if (!('IntersectionObserver' in window)) {
+        items.forEach(el => el.classList.add('in-view'));
+        return;
+      }
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.2 });
+      items.forEach(el => observer.observe(el));
+    })();
+
+    // Section D — dedicated observer that adds .labels-spread to the divider
+    // ONLY when the band is fully in view (threshold 1.0). This delays the
+    // OBSERVATION/ACTION label spread animation until the band has finished
+    // entering the viewport, so the user sees the divider settle first.
+    (function () {
+      const stage = document.querySelector('.divider-stage');
+      if (!stage) return;
+      if (!('IntersectionObserver' in window)) {
+        stage.classList.add('labels-spread');
+        return;
+      }
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            stage.classList.add('labels-spread');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 1.0 });
+      io.observe(stage);
+    })();
+
+    // Section B+C — dedicated observer that adds .in-view to .caption-block
+    // ONLY when most of it is on screen (threshold 0.9). On both desktop
+    // and mobile, the caption-block enters the viewport only after most
+    // of the bloom has scrolled into view, so this threshold delays the
+    // line + caption text reveal until "most of the bloom is visible".
+    (function () {
+      const block = document.querySelector('.caption-block');
+      if (!block) return;
+      if (!('IntersectionObserver' in window)) {
+        block.classList.add('in-view');
+        return;
+      }
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            block.classList.add('in-view');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.9 });
+      io.observe(block);
+    })();
+
+    // Section B+C — bloom-wrap reveal trigger. Adds .in-view to the wrapper
+    // when 50% of the bloom is actually in the viewport. Earlier thresholds
+    // fired too soon — the animation completed while the user was still
+    // looking at the hero. Threshold 0.5 ensures the user has scrolled
+    // far enough that the fade + scale plays out across the visible bloom.
+    (function () {
+      const wrap = document.querySelector('.bloom-wrap');
+      if (!wrap) return;
+      if (!('IntersectionObserver' in window)) {
+        wrap.classList.add('in-view');
+        return;
+      }
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            wrap.classList.add('in-view');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.5 });
+      io.observe(wrap);
+    })();
+
+    // Generic background-parallax controller — any element with a
+    // `data-parallax="<strength>"` attribute drifts its background-image
+    // vertically as the element passes through the viewport. Effect is
+    // applied via the `--parallax-y` custom property, which each element's
+    // CSS feeds into its `background-position` calc().
+    //
+    // Desktop only (≥1024px). On mobile the hero bloom position is finely
+    // calibrated (32% rule) and the deeptech crop is content-driven; both
+    // would be disrupted by parallax. Skipped under prefers-reduced-motion.
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (!window.matchMedia('(min-width: 1024px)').matches) return;
+
+      const els = document.querySelectorAll('[data-parallax]');
+      if (!els.length) return;
+
+      const items = Array.from(els).map(el => ({
+        el,
+        strength: parseFloat(el.dataset.parallax) || 0.10,
+      }));
+
+      let ticking = false;
+
+      function update() {
+        const vh = window.innerHeight;
+        const vpCenter = vh / 2;
+        items.forEach(({ el, strength }) => {
+          const rect = el.getBoundingClientRect();
+          // Skip if well off-screen — saves CPU on a long page.
+          if (rect.bottom < -vh * 0.5 || rect.top > vh * 1.5) return;
+          // Distance from viewport centre to element centre. Negative when
+          // the element has scrolled above centre.
+          const elCenter = rect.top + rect.height / 2;
+          const distance = elCenter - vpCenter;
+          // Clamp at ±vh so the bg can't drift past its overflow allowance.
+          const clamped = Math.max(-vh, Math.min(vh, distance));
+          // Inverse sign → bg moves opposite to element travel = "lag" feel.
+          const offset = -clamped * strength;
+          el.style.setProperty('--parallax-y', offset + 'px');
+        });
+        ticking = false;
+      }
+
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          requestAnimationFrame(update);
+          ticking = true;
+        }
+      }, { passive: true });
+
+      // Set initial positions on load so the hero doesn't snap on first scroll.
+      update();
+    })();
+
+    // ===== BEGIN: divider particle effect (JS) ====================
+    // Section D — horizontal particle drift across the band, with a slow
+    // brightness pulse traveling left→right along the horizon line. Echoes
+    // the OBSERVATION → ACTION narrative. Same motion vocabulary as the hero
+    // (additive blending, halo+core 2-pass draw, 30fps cap, IO pause,
+    // prefers-reduced-motion guard). To disable, delete this entire block,
+    // the matching CSS block, and the matching <canvas> in the HTML.
+    (function () {
+      const canvas = document.getElementById('dividerParticles');
+      if (!canvas) return;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) return;
+
+      const ctx = canvas.getContext('2d');
+      const stage = canvas.parentElement;       // .divider-stage
+      const DPR = Math.min(window.devicePixelRatio || 1, 1.25);
+      const FRAME_MS = 1000 / 24;               // ambient effect — 24fps is plenty
+      const MAX = 80;
+      const PULSE_DURATION_MS = 8000;           // one full L→R sweep
+
+      let W = 0, H = 0, centerY = 0;
+      const particles = [];
+
+      function resize() {
+        const rect = stage.getBoundingClientRect();
+        W = rect.width;
+        H = rect.height;
+        centerY = H * 0.5;
+        canvas.width = Math.round(W * DPR);
+        canvas.height = Math.round(H * DPR);
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      }
+
+      function spawn() {
+        // 80% drift left→right (with the OBSERVATION→ACTION flow), 20% reverse
+        // for visual complexity. Slight y jitter around the bright horizon.
+        const goingRight = Math.random() < 0.8;
+        const speed = 0.4 + Math.random() * 1.1;       // 0.4–1.5 px/frame at 30fps
+        const yJitter = (Math.random() - 0.5) * H * 0.36;
+        const life = 1.0;
+        return {
+          x: goingRight ? -10 : W + 10,
+          y: centerY + yJitter,
+          vx: goingRight ? speed : -speed,
+          size: 0.7 + Math.random() * 1.3,             // 0.7–2.0 px core
+          life,
+          // Cool blue-white tint, occasional warm fleck for variety.
+          color: Math.random() < 0.15
+            ? [255, 200, 178]                          // warm fleck
+            : [220, 232, 255],                         // cool default
+        };
+      }
+
+      // One-shot fill: place particles already distributed across the band so
+      // the band is populated the moment it scrolls into view (instead of
+      // taking ~1.5s to fill from the edges via spawn()).
+      function prepopulate() {
+        for (let i = 0; i < MAX; i++) {
+          const p = spawn();
+          p.x = Math.random() * W;          // random x already inside the band
+          particles.push(p);
+        }
+      }
+
+      function step() {
+        // Steady-state spawn — replenishes particles as they drift off-stage.
+        while (particles.length < MAX && Math.random() < 0.4) {
+          particles.push(spawn());
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          // Fade based on horizontal position — peak at centre, fade at edges.
+          const distFromCenter = Math.abs(p.x - W * 0.5) / (W * 0.5);
+          p.life = Math.max(0, 1 - distFromCenter);
+          // Recycle when off-stage.
+          if (p.x < -20 || p.x > W + 20) particles.splice(i, 1);
+        }
+      }
+
+      function drawPulse(now) {
+        const t = (now % PULSE_DURATION_MS) / PULSE_DURATION_MS;   // 0..1
+        const x = t * W;
+        // Tie radius to band HEIGHT (not width) so the gradient fades to zero
+        // before reaching the top/bottom edges — prevents the pulse from
+        // brightening those edges of the source image.
+        const radius = H * 0.45;
+        // Gentle fade at the very edges so the pulse doesn't pop in/out.
+        let alpha = 0.16;
+        if (t < 0.08) alpha *= t / 0.08;
+        else if (t > 0.92) alpha *= (1 - t) / 0.08;
+        const grad = ctx.createRadialGradient(x, centerY, 0, x, centerY, radius);
+        grad.addColorStop(0, 'rgba(220, 232, 255, ' + alpha + ')');
+        grad.addColorStop(1, 'rgba(220, 232, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      function drawParticles() {
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          const a = p.life * 0.85;
+          const rgb = p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',';
+          // Soft halo
+          ctx.fillStyle = 'rgba(' + rgb + (a * 0.28) + ')';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
+          ctx.fill();
+          // Bright core
+          ctx.fillStyle = 'rgba(' + rgb + a + ')';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      let running = false;
+      let last = 0;
+      function tick(now) {
+        if (!running) return;
+        if (now - last < FRAME_MS) {
+          requestAnimationFrame(tick);
+          return;
+        }
+        last = now;
+        ctx.clearRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'lighter';
+        drawPulse(now);
+        step();
+        drawParticles();
+        ctx.globalCompositeOperation = 'source-over';
+        requestAnimationFrame(tick);
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      // Only run while the divider is visible — saves cycles when off-screen.
+      let populated = false;
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(e => {
+            if (e.isIntersecting && !running) {
+              if (!populated) { prepopulate(); populated = true; }
+              running = true;
+              last = 0;
+              requestAnimationFrame(tick);
+            } else if (!e.isIntersecting) {
+              running = false;
+            }
+          });
+        }, { threshold: 0 });
+        io.observe(stage);
+      } else {
+        if (!populated) { prepopulate(); populated = true; }
+        running = true;
+        requestAnimationFrame(tick);
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          running = false;
+        } else if (!running) {
+          running = true;
+          last = 0;
+          requestAnimationFrame(tick);
+        }
+      });
+    })();
+    // ===== END: divider particle effect (JS) ======================
+
+    // ===== BEGIN: bloom right-half pulse (JS) ====================
+    // Section B/C — single static white glow at the centre of the bloom
+    // PLUS warm "ember" particles emitting from that central point and
+    // drifting outward. The breathing pulse halo was removed; now there's
+    // only the steady glow and the embers. Cheap: one gradient + a handful
+    // of small arc draws per frame, 30fps cap, IO-paused when off-screen,
+    // prefers-reduced-motion guard. To disable, delete this entire block,
+    // the matching CSS block, and the matching <canvas>.
+    (function () {
+      const canvas = document.getElementById('bloomPulse');
+      if (!canvas) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      const ctx = canvas.getContext('2d');
+      const stage = canvas.parentElement;       // .bloom-wrap
+      const DPR = Math.min(window.devicePixelRatio || 1, 1.25);
+      const FRAME_MS = 1000 / 24;               // ambient effect — 24fps is plenty
+      const EMBER_MAX = 192;
+
+      let W = 0, H = 0;
+      let sizeScale = 1.0;                      // particle size multiplier — bumped on mobile
+      const embers = [];
+
+      function resize() {
+        // Use offsetWidth/Height (layout size, transform-independent) so the
+        // canvas always tracks the wrapper's natural box even while .bloom-wrap
+        // is mid-reveal at scale(0.70). getBoundingClientRect would return the
+        // post-transform rect — that previously caused the canvas to be sized
+        // and anchored to the wrapper's top-left at 70% size on first init.
+        // Don't set canvas.style.width/height — the CSS rule
+        // .bloom-pulse { width: 100%; height: 100% } handles display sizing.
+        W = stage.offsetWidth;
+        H = stage.offsetHeight;
+        canvas.width = Math.round(W * DPR);
+        canvas.height = Math.round(H * DPR);
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        // The bloom image is rendered ~30% larger on mobile (background-size
+        // 175% vs 135%); scale particles to match so they don't shrink
+        // visually relative to the bigger bloom.
+        sizeScale = window.innerWidth < 768 ? 1.35 : 1.0;
+      }
+
+      // Single emitter at the centre of the bloom — both the white glow
+      // and the embers radiate from this one point.
+      function focalX() { return W * 0.50; }
+      function focalY() { return H * 0.50; }
+
+      function spawnEmber() {
+        // Polar-coord motion: each particle has an angle (direction) and a
+        // radius (distance from centre). Each frame the radius grows
+        // (outward drift) AND the angle shifts (swirl around the centre).
+        const angle = Math.random() * Math.PI * 2;
+        const radialVel = 2.20 + Math.random() * 4.20;
+        // Angular velocity in rad/frame — random sign so some particles
+        // swirl clockwise and some counter-clockwise. ±0.10 rad/frame at
+        // 24fps ≈ ±0.4 rotations per second; combined with the outward
+        // drift this yields a clear curved spiral path per particle.
+        const angularVel = (Math.random() - 0.5) * 0.20;
+        const maxRadius = W * (0.32 + Math.random() * 0.18);
+        return {
+          cx: focalX(),
+          cy: focalY(),
+          angle: angle,
+          radius: 0,
+          angularVel: angularVel,
+          radialVel: radialVel,
+          maxRadius: maxRadius,
+          size: (0.3 + Math.random() * 1.7) * sizeScale,
+        };
+      }
+
+      // One-shot fill: place embers already distributed along their spiral
+      // paths (random progress 0..1) so the field is fully populated the
+      // moment the bloom scrolls into view.
+      function prepopulate() {
+        for (let i = 0; i < EMBER_MAX; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const radialVel = 2.20 + Math.random() * 4.20;
+          const angularVel = (Math.random() - 0.5) * 0.20;
+          const maxRadius = W * (0.32 + Math.random() * 0.18);
+          const progress = Math.random();
+          embers.push({
+            cx: focalX(),
+            cy: focalY(),
+            angle: angle,
+            radius: progress * maxRadius,
+            angularVel: angularVel,
+            radialVel: radialVel,
+            maxRadius: maxRadius,
+            size: (0.3 + Math.random() * 1.7) * sizeScale,
+          });
+        }
+      }
+
+      function stepEmbers(dtMs) {
+        // Spawn rate scaled with EMBER_MAX so the field replenishes at the
+        // same proportional rate as before.
+        if (Math.random() < 0.54 && embers.length < EMBER_MAX) {
+          embers.push(spawnEmber());
+        }
+        const f = dtMs / FRAME_MS;              // frames-worth of motion this step
+        for (let i = embers.length - 1; i >= 0; i--) {
+          const e = embers[i];
+          e.angle  += e.angularVel * f;
+          e.radius += e.radialVel  * f;
+          if (e.radius >= e.maxRadius) embers.splice(i, 1);
+        }
+      }
+
+      function drawEmbers() {
+        for (let i = 0; i < embers.length; i++) {
+          const e = embers[i];
+          // Convert polar back to Cartesian for drawing.
+          const x = e.cx + Math.cos(e.angle) * e.radius;
+          const y = e.cy + Math.sin(e.angle) * e.radius;
+          // t = travel progress, 0 at centre → 1 at perimeter (maxRadius).
+          const t = Math.min(1, e.radius / e.maxRadius);
+
+          // Colour transitions across travel:
+          //   0.00 → 0.40   white   (255, 255, 255)
+          //   0.40 → 0.75   yellow  (255, 220, 100)
+          //   0.75 → 1.00   orange  (255, 140, 40)
+          let r = 255, g, b;
+          if (t < 0.40) {
+            const u = t / 0.40;
+            g = 255 - 35 * u;
+            b = 255 - 155 * u;
+          } else if (t < 0.75) {
+            const u = (t - 0.40) / 0.35;
+            g = 220 - 80 * u;
+            b = 100 - 60 * u;
+          } else {
+            g = 140;
+            b = 40;
+          }
+
+          // Alpha: fade in over first 8%, hold until 60%, fade to zero by
+          // the perimeter so they're invisible by the time they're culled.
+          let a;
+          if (t < 0.08) a = t / 0.08;
+          else if (t > 0.60) a = 1 - (t - 0.60) / 0.40;
+          else a = 1;
+          a *= 0.55;                            // subtle peak
+
+          const rgb = (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ',';
+          // Soft halo
+          ctx.fillStyle = 'rgba(' + rgb + (a * 0.28) + ')';
+          ctx.beginPath();
+          ctx.arc(x, y, e.size * 3, 0, Math.PI * 2);
+          ctx.fill();
+          // Bright core
+          ctx.fillStyle = 'rgba(' + rgb + a + ')';
+          ctx.beginPath();
+          ctx.arc(x, y, e.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function draw(now, dtMs) {
+        ctx.clearRect(0, 0, W, H);
+
+        const fx = focalX();
+        const fy = focalY();
+        const radius = W * 0.18;
+
+        // 1. Single static white glow at the centre of the bloom — visible
+        //    source from which the embers emit.
+        const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, radius);
+        grad.addColorStop(0,    'rgba(255, 255, 255, 0.18)');
+        grad.addColorStop(0.55, 'rgba(255, 255, 255, 0.08)');
+        grad.addColorStop(1,    'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // 2. Embers — additive blending so overlapping particles add up
+        //    into brighter glow rather than flat-painting over each other.
+        ctx.globalCompositeOperation = 'lighter';
+        stepEmbers(dtMs);
+        drawEmbers();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
+      let running = false;
+      let last = 0;
+      function tick(now) {
+        if (!running) return;
+        if (now - last < FRAME_MS) {
+          requestAnimationFrame(tick);
+          return;
+        }
+        const dt = last === 0 ? FRAME_MS : (now - last);
+        last = now;
+        draw(now, dt);
+        requestAnimationFrame(tick);
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      // The bloom-wrap reveals with a slow opacity + scale(0.96 → 1)
+      // transition. We hold off the canvas until that transform finishes
+      // (a) so the GPU isn't fighting an animating wrapper AND a live
+      // canvas, and (b) so the canvas pixel buffer can be re-sized
+      // against the final post-scale dimensions instead of the
+      // pre-scale rect captured at init time.
+      let populated = false;
+      let revealCompleted = false;
+      let stageVisible = false;
+
+      function maybeStart() {
+        if (revealCompleted && stageVisible && !running) {
+          if (!populated) { prepopulate(); populated = true; }
+          running = true;
+          last = 0;
+          requestAnimationFrame(tick);
+        }
+      }
+
+      function markRevealCompleted() {
+        if (revealCompleted) return;
+        revealCompleted = true;
+        resize();           // canvas buffer now matches final (post-scale) size
+        maybeStart();
+      }
+
+      stage.addEventListener('transitionend', (e) => {
+        if (e.propertyName === 'transform') markRevealCompleted();
+      });
+      // Defensive fallback — if the transitionend never fires (reduced
+      // motion etc.), unblock after a generous timeout so the canvas
+      // isn't permanently dormant.
+      setTimeout(markRevealCompleted, 2500);
+
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(e => {
+            stageVisible = e.isIntersecting;
+            if (e.isIntersecting) maybeStart();
+            else running = false;
+          });
+        }, { threshold: 0 });
+        io.observe(stage);
+      } else {
+        stageVisible = true;
+        revealCompleted = true;
+        maybeStart();
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          running = false;
+        } else {
+          maybeStart();
+        }
+      });
+    })();
+    // ===== END: bloom right-half pulse (JS) ======================
+  </script>
+
+</body>
+</html>
