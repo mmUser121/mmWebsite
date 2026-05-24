@@ -202,6 +202,13 @@
       font-weight: 300;                                  /* Light Italic */
       letter-spacing: 0;
     }
+    /* Mobile/tablet: italic phrase becomes its own block so it starts on a
+       new visual line (matches V1's tidy stacked wrap); the .h1-line-2
+       desktop break is demoted to inline so it doesn't add a third block. */
+    @media (max-width: 1023px) {
+      .h1-display .h1-line-2 { display: inline; }
+      .h1-display .italic-line { display: block; }
+    }
 
     .intro-text {
       font-family: 'Sora', sans-serif;
