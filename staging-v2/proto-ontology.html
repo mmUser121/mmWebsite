@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MatterMind — Ontology core (Canvas 2D prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #06060E; }
+  html, body { margin: 0; background: var(--bg); color: #fff; font-family: system-ui, sans-serif; }
+
+  /* Tall scroll area so we can preview the scroll-triggered reveal.
+     Stage is sticky/pinned for one viewport; spacer gives scroll room.
+     In production this becomes a normal section. */
+  .scroll-space { height: 360vh; position: relative; }
+  .stage {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* Stacked layers, all centred on the same horizontal band.
+     Stacking order back→front: tray → refinery → node canvas.
+     All three PNGs have alpha, so no blend mode is needed — the tray
+     shows through the transparent areas above it.
+     Reveal order on scroll: refinery → node field → tray. */
+  .layer {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    will-change: opacity;
+  }
+  #trayLayer {
+    width: min(620px, 40vw);       /* scaled down to match the design */
+    z-index: 2;                    /* behind the ontology, above the ground gradient */
+    top: 60%;                      /* overridden by JS to the ground line */
+    transform: translateX(-50%);   /* top-anchored at the ground line, feeding down */
+    opacity: 1;
+    clip-path: inset(0 0 100% 0);  /* hidden until scroll reveals top→bottom */
+  }
+  #refineryLayer {
+    width: min(1040px, 66vw);
+    z-index: 3;
+    opacity: 0;
+  }
+  #ontologyCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 5;                    /* top — logo + nodes sit above the ground line/labels */
+    opacity: 0;
+    will-change: opacity;
+  }
+  .layer img { display: block; width: 100%; height: auto; }
+  /* overlay canvas for glowing particles travelling down the tray streamlines */
+  #trayFlow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* Ground-line devices — the 1px horizon line, the maroon gradient wash
+     beneath it, and the OBSERVATION / ACTION labels. All positioned in JS
+     to the refinery base (the "ground point"). */
+  .ground-gradient {
+    position: absolute;
+    left: 0; width: 100%;
+    height: clamp(45px, 6.5vh, 80px);
+    background: linear-gradient(to bottom, #2C191D 0%, rgba(44,25,29,0) 100%);
+    opacity: 0;
+    z-index: 1;                    /* very back — a subtle horizon wash */
+    pointer-events: none;
+    will-change: opacity;
+  }
+  .ground-line {
+    position: absolute;
+    left: 0; width: 100%;
+    height: 1px;
+    background: #615256;
+    transform: scaleX(0);
+    transform-origin: left center; /* extends left → right */
+    z-index: 4;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .ground-label {
+    position: absolute;
+    left: clamp(24px, 4vw, 64px);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+    opacity: 0;
+    z-index: 4;
+    pointer-events: none;
+    white-space: nowrap;
+    will-change: opacity, transform, clip-path;
+  }
+
+  .hint {
+    position: fixed; left: 16px; bottom: 14px;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(255,255,255,0.5); pointer-events: none; font-family: monospace;
+  }
+  .pre, .post { height: 60vh; display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.25); font-size: 12px; letter-spacing: 0.2em;
+    text-transform: uppercase; font-family: monospace; }
+</style>
+</head>
+<body>
+  <div class="pre">scroll down ↓</div>
+
+  <div class="scroll-space">
+    <div class="stage">
+      <div id="trayLayer" class="layer"><img src="images/tray.png" alt="" /><canvas id="trayFlow" aria-hidden="true"></canvas></div>
+      <div id="refineryLayer" class="layer"><img src="images/refinery.png" alt="" /></div>
+      <canvas id="ontologyCanvas" aria-hidden="true"></canvas>
+      <div id="groundGrad" class="ground-gradient"></div>
+      <div id="groundLine" class="ground-line"></div>
+      <div id="obsLabel" class="ground-label">OBSERVATION</div>
+      <div id="actLabel" class="ground-label">ACTION</div>
+    </div>
+  </div>
+
+  <div class="post">section below</div>
+  <div class="hint">Prototype · ontology core (flat 2D)</div>
+
+<script>
+/* MatterMind ontology tray ribs — accurate polylines derived from pathref.svg (17 paths, 60 pts each).
+   Normalised: y 0..1 = rib top..bottom (full height); x centred ~0.5, aspect-preserved. */
+window.RIB_PATHS=[[[0.3655,0.0033],[0.3637,0.0226],[0.3617,0.0419],[0.3594,0.0611],[0.3568,0.0804],[0.3541,0.0996],[0.3512,0.1187],[0.348,0.1379],[0.3446,0.157],[0.341,0.176],[0.3372,0.195],[0.3331,0.214],[0.3288,0.2329],[0.3241,0.2517],[0.3192,0.2705],[0.314,0.2892],[0.3085,0.3077],[0.3026,0.3262],[0.2963,0.3446],[0.2896,0.3627],[0.2823,0.3807],[0.2747,0.3986],[0.2664,0.4161],[0.2574,0.4333],[0.2477,0.4501],[0.2371,0.4663],[0.2258,0.4821],[0.2138,0.4973],[0.2012,0.512],[0.1879,0.5261],[0.1742,0.5399],[0.1601,0.5532],[0.1457,0.5662],[0.131,0.5788],[0.1162,0.5913],[0.1012,0.6036],[0.0862,0.6159],[0.0712,0.6283],[0.0564,0.6407],[0.0418,0.6535],[0.0275,0.6666],[0.0137,0.6802],[0.0004,0.6944],[-0.012,0.7093],[-0.0234,0.7249],[-0.0337,0.7413],[-0.0427,0.7585],[-0.0502,0.7764],[-0.0562,0.7948],[-0.0611,0.8136],[-0.0647,0.8326],[-0.0668,0.8519],[-0.0674,0.8713],[-0.0664,0.8907],[-0.0637,0.9098],[-0.0593,0.9287],[-0.0532,0.9471],[-0.0455,0.9649],[-0.036,0.9818],[-0.0246,0.9975]],[[0.3679,0.0035],[0.3662,0.0227],[0.3642,0.0419],[0.3619,0.061],[0.3595,0.0801],[0.3568,0.0993],[0.354,0.1183],[0.3509,0.1374],[0.3477,0.1564],[0.3442,0.1753],[0.3405,0.1943],[0.3366,0.2132],[0.3324,0.232],[0.328,0.2508],[0.3233,0.2695],[0.3183,0.2881],[0.313,0.3066],[0.3073,0.3251],[0.3013,0.3434],[0.2949,0.3616],[0.288,0.3796],[0.2807,0.3974],[0.2728,0.415],[0.2643,0.4324],[0.2551,0.4493],[0.245,0.4658],[0.2343,0.4818],[0.2228,0.4972],[0.2106,0.5122],[0.1978,0.5266],[0.1845,0.5406],[0.1707,0.5541],[0.1566,0.5672],[0.1421,0.58],[0.1275,0.5925],[0.1126,0.6048],[0.0978,0.6171],[0.0829,0.6294],[0.0682,0.6419],[0.0537,0.6546],[0.0395,0.6677],[0.0259,0.6813],[0.0128,0.6955],[0.0006,0.7104],[-0.0106,0.7261],[-0.0207,0.7426],[-0.0294,0.7598],[-0.0367,0.7776],[-0.0426,0.7959],[-0.0474,0.8146],[-0.0509,0.8336],[-0.0529,0.8528],[-0.0534,0.872],[-0.0524,0.8913],[-0.0496,0.9104],[-0.0453,0.9291],[-0.0392,0.9474],[-0.0315,0.9651],[-0.022,0.9819],[-0.0107,0.9975]],[[0.5854,0.0035],[0.5867,0.0227],[0.5883,0.0419],[0.5902,0.0611],[0.5923,0.0802],[0.5946,0.0994],[0.5972,0.1185],[0.5999,0.1375],[0.6029,0.1566],[0.6061,0.1756],[0.6095,0.1945],[0.6131,0.2135],[0.6171,0.2323],[0.6212,0.2511],[0.6257,0.2699],[0.6305,0.2885],[0.6357,0.3071],[0.6411,0.3256],[0.647,0.3439],[0.6533,0.3621],[0.6601,0.3802],[0.6673,0.398],[0.6752,0.4156],[0.6837,0.4329],[0.6929,0.4498],[0.703,0.4663],[0.7138,0.4822],[0.7253,0.4977],[0.7375,0.5126],[0.7503,0.527],[0.7636,0.5409],[0.7773,0.5544],[0.7915,0.5675],[0.8059,0.5803],[0.8206,0.5928],[0.8354,0.6051],[0.8502,0.6174],[0.8651,0.6297],[0.8798,0.6421],[0.8943,0.6548],[0.9084,0.6679],[0.9221,0.6815],[0.9351,0.6957],[0.9473,0.7106],[0.9585,0.7263],[0.9685,0.7428],[0.9772,0.76],[0.9844,0.7778],[0.9904,0.7961],[0.9951,0.8148],[0.9986,0.8337],[1.0006,0.8529],[1.0011,0.8722],[1.0001,0.8914],[0.9973,0.9105],[0.9929,0.9292],[0.9869,0.9475],[0.9791,0.9651],[0.9697,0.9819],[0.9584,0.9975]],[[0.4512,0.0026],[0.4515,0.0205],[0.4514,0.0384],[0.4512,0.0563],[0.4509,0.0742],[0.4504,0.0921],[0.4497,0.11],[0.4489,0.1279],[0.4479,0.1458],[0.4467,0.1637],[0.4454,0.1815],[0.4439,0.1994],[0.4422,0.2172],[0.4403,0.235],[0.4383,0.2528],[0.4359,0.2706],[0.4334,0.2883],[0.4306,0.306],[0.4276,0.3237],[0.4242,0.3413],[0.4206,0.3588],[0.4165,0.3762],[0.4121,0.3936],[0.4072,0.4108],[0.4019,0.4279],[0.396,0.4448],[0.3895,0.4615],[0.3822,0.4779],[0.3742,0.4939],[0.3658,0.5097],[0.3571,0.5254],[0.3481,0.5409],[0.3387,0.5561],[0.329,0.5712],[0.319,0.586],[0.3087,0.6007],[0.2981,0.6151],[0.2873,0.6294],[0.2765,0.6437],[0.2658,0.658],[0.2555,0.6727],[0.2458,0.6878],[0.2371,0.7034],[0.2296,0.7197],[0.2233,0.7364],[0.2181,0.7536],[0.214,0.771],[0.211,0.7887],[0.2092,0.8065],[0.2085,0.8244],[0.2088,0.8423],[0.2101,0.8601],[0.2123,0.8779],[0.2153,0.8956],[0.2191,0.9131],[0.2236,0.9304],[0.2288,0.9476],[0.2346,0.9645],[0.2412,0.9812],[0.2485,0.9975]],[[0.4429,0.0026],[0.4428,0.0206],[0.4426,0.0385],[0.4422,0.0565],[0.4417,0.0745],[0.441,0.0924],[0.4401,0.1104],[0.4392,0.1283],[0.4381,0.1463],[0.4368,0.1642],[0.4354,0.1821],[0.4338,0.2],[0.4321,0.2179],[0.4301,0.2357],[0.428,0.2536],[0.4257,0.2714],[0.4231,0.2892],[0.4203,0.307],[0.4173,0.3247],[0.4139,0.3423],[0.4103,0.3599],[0.4062,0.3774],[0.4018,0.3948],[0.3969,0.4121],[0.3914,0.4292],[0.3853,0.4461],[0.3786,0.4628],[0.3708,0.479],[0.3622,0.4948],[0.3531,0.5103],[0.3437,0.5256],[0.334,0.5407],[0.324,0.5556],[0.3137,0.5703],[0.3031,0.5849],[0.2923,0.5992],[0.2813,0.6135],[0.2704,0.6277],[0.2595,0.642],[0.2489,0.6565],[0.2388,0.6714],[0.2293,0.6867],[0.2208,0.7025],[0.2133,0.7188],[0.2069,0.7356],[0.2017,0.7528],[0.1975,0.7703],[0.1944,0.788],[0.1925,0.8058],[0.1918,0.8238],[0.1921,0.8417],[0.1934,0.8597],[0.1955,0.8775],[0.1985,0.8952],[0.2023,0.9128],[0.2068,0.9302],[0.212,0.9474],[0.2178,0.9644],[0.2244,0.9811],[0.2318,0.9975]],[[0.4881,0.0026],[0.4875,0.02],[0.4871,0.0375],[0.4869,0.0549],[0.4868,0.0723],[0.4869,0.0898],[0.4871,0.1072],[0.4875,0.1247],[0.488,0.1421],[0.4887,0.1595],[0.4895,0.1769],[0.4905,0.1944],[0.4917,0.2118],[0.493,0.2291],[0.4945,0.2465],[0.4962,0.2639],[0.4981,0.2812],[0.5003,0.2985],[0.5027,0.3158],[0.5053,0.333],[0.5083,0.3502],[0.5115,0.3674],[0.515,0.3844],[0.519,0.4014],[0.5233,0.4183],[0.5281,0.4351],[0.5334,0.4517],[0.5393,0.4681],[0.5458,0.4843],[0.5531,0.5001],[0.5613,0.5155],[0.57,0.5306],[0.5788,0.5457],[0.5876,0.5607],[0.5965,0.5758],[0.6053,0.5908],[0.6141,0.6059],[0.6228,0.621],[0.6314,0.6362],[0.6395,0.6516],[0.6471,0.6673],[0.6536,0.6835],[0.6588,0.7001],[0.6627,0.7171],[0.6657,0.7343],[0.668,0.7516],[0.67,0.7689],[0.6716,0.7863],[0.6723,0.8037],[0.6723,0.8211],[0.6717,0.8386],[0.6705,0.856],[0.6689,0.8733],[0.6667,0.8906],[0.6642,0.9079],[0.6612,0.9251],[0.6579,0.9422],[0.6542,0.9593],[0.6502,0.9762],[0.6457,0.9931]],[[0.4708,0.0031],[0.4706,0.0205],[0.4705,0.0378],[0.4707,0.0551],[0.4709,0.0724],[0.4713,0.0898],[0.4718,0.1071],[0.4724,0.1244],[0.4732,0.1417],[0.4741,0.159],[0.4751,0.1763],[0.4763,0.1936],[0.4776,0.2109],[0.479,0.2281],[0.4806,0.2454],[0.4824,0.2626],[0.4844,0.2798],[0.4865,0.297],[0.4888,0.3142],[0.4914,0.3313],[0.4942,0.3484],[0.4972,0.3655],[0.5005,0.3825],[0.5041,0.3994],[0.5081,0.4163],[0.5124,0.4331],[0.5172,0.4498],[0.5224,0.4663],[0.5281,0.4826],[0.5345,0.4987],[0.5415,0.5145],[0.5495,0.5299],[0.5577,0.5452],[0.5658,0.5605],[0.5739,0.5758],[0.5818,0.5912],[0.5897,0.6067],[0.5973,0.6222],[0.6047,0.6379],[0.6118,0.6537],[0.6183,0.6698],[0.624,0.6861],[0.6288,0.7028],[0.6323,0.7197],[0.6349,0.7369],[0.6368,0.7541],[0.6386,0.7713],[0.64,0.7886],[0.6405,0.8059],[0.64,0.8232],[0.639,0.8405],[0.6374,0.8578],[0.6354,0.875],[0.6331,0.8921],[0.6304,0.9093],[0.6275,0.9263],[0.6243,0.9434],[0.6209,0.9604],[0.6172,0.9773],[0.6133,0.9942]],[[0.468,0.0026],[0.4681,0.0196],[0.4682,0.0366],[0.4683,0.0537],[0.4684,0.0707],[0.4685,0.0877],[0.4685,0.1047],[0.4685,0.1217],[0.4686,0.1388],[0.4686,0.1558],[0.4685,0.1728],[0.4685,0.1898],[0.4684,0.2069],[0.4684,0.2239],[0.4683,0.2409],[0.4681,0.2579],[0.468,0.2749],[0.4678,0.292],[0.4676,0.309],[0.4674,0.326],[0.4671,0.343],[0.4668,0.36],[0.4665,0.3771],[0.4661,0.3941],[0.4656,0.4111],[0.4651,0.4281],[0.4645,0.4451],[0.4638,0.4621],[0.463,0.4791],[0.462,0.4961],[0.4607,0.5131],[0.459,0.53],[0.4569,0.5469],[0.4541,0.5637],[0.4507,0.5804],[0.4464,0.5969],[0.4414,0.6131],[0.4357,0.6292],[0.4298,0.6451],[0.4241,0.6612],[0.4189,0.6774],[0.4145,0.6938],[0.4108,0.7104],[0.4077,0.7272],[0.4052,0.744],[0.403,0.7609],[0.4014,0.7778],[0.4002,0.7948],[0.3995,0.8118],[0.3993,0.8288],[0.3996,0.8458],[0.4003,0.8628],[0.4015,0.8798],[0.4032,0.8968],[0.4053,0.9137],[0.4079,0.9305],[0.411,0.9472],[0.4146,0.9638],[0.4188,0.9804],[0.4237,0.9967]],[[0.4708,0],[0.4701,0.0171],[0.4695,0.0342],[0.4688,0.0514],[0.4682,0.0685],[0.4675,0.0856],[0.4669,0.1027],[0.4662,0.1198],[0.4655,0.137],[0.4648,0.1541],[0.4641,0.1712],[0.4635,0.1883],[0.4628,0.2054],[0.4621,0.2225],[0.4613,0.2397],[0.4606,0.2568],[0.4599,0.2739],[0.4592,0.291],[0.4584,0.3081],[0.4577,0.3252],[0.4569,0.3424],[0.4561,0.3595],[0.4553,0.3766],[0.4545,0.3937],[0.4537,0.4108],[0.4528,0.4279],[0.4519,0.445],[0.451,0.4621],[0.4501,0.4793],[0.449,0.4963],[0.4475,0.5134],[0.4455,0.5304],[0.4429,0.5474],[0.4394,0.5641],[0.4351,0.5807],[0.4298,0.597],[0.4236,0.613],[0.4166,0.6286],[0.4095,0.6442],[0.4026,0.6599],[0.3964,0.6759],[0.3911,0.6921],[0.3868,0.7087],[0.3832,0.7255],[0.3804,0.7424],[0.3781,0.7593],[0.3764,0.7764],[0.3752,0.7935],[0.3745,0.8106],[0.3742,0.8277],[0.3745,0.8449],[0.3752,0.862],[0.3764,0.8791],[0.3781,0.8961],[0.3802,0.9131],[0.3828,0.93],[0.3859,0.9469],[0.3895,0.9636],[0.3937,0.9803],[0.3986,0.9967]],[[0.4206,0.0026],[0.4205,0.0213],[0.4201,0.0399],[0.4194,0.0586],[0.4186,0.0772],[0.4176,0.0958],[0.4164,0.1145],[0.415,0.1331],[0.4134,0.1517],[0.4116,0.1702],[0.4096,0.1888],[0.4073,0.2073],[0.4049,0.2258],[0.4021,0.2443],[0.3991,0.2627],[0.3959,0.2811],[0.3923,0.2994],[0.3884,0.3176],[0.3841,0.3358],[0.3794,0.3539],[0.3743,0.3718],[0.3688,0.3896],[0.3627,0.4072],[0.3559,0.4246],[0.3485,0.4418],[0.3403,0.4585],[0.3312,0.4748],[0.3211,0.4905],[0.3104,0.5058],[0.2992,0.5207],[0.2877,0.5354],[0.2756,0.5496],[0.2631,0.5635],[0.2503,0.577],[0.2371,0.5902],[0.2236,0.6031],[0.2099,0.6158],[0.1962,0.6285],[0.1825,0.6412],[0.1691,0.6542],[0.1563,0.6677],[0.1441,0.6819],[0.1331,0.6969],[0.1232,0.7127],[0.1147,0.7293],[0.1076,0.7466],[0.1017,0.7643],[0.097,0.7823],[0.0935,0.8007],[0.0913,0.8192],[0.0903,0.8378],[0.0905,0.8565],[0.0919,0.8751],[0.0946,0.8935],[0.0984,0.9118],[0.1034,0.9298],[0.1094,0.9474],[0.1165,0.9647],[0.1247,0.9814],[0.1342,0.9975]],[[0.5187,0.0026],[0.5189,0.0213],[0.5193,0.0399],[0.5199,0.0586],[0.5207,0.0772],[0.5217,0.0958],[0.5229,0.1145],[0.5243,0.1331],[0.5259,0.1517],[0.5277,0.1702],[0.5297,0.1888],[0.532,0.2073],[0.5345,0.2258],[0.5372,0.2443],[0.5402,0.2627],[0.5434,0.2811],[0.547,0.2994],[0.5509,0.3176],[0.5552,0.3358],[0.5599,0.3539],[0.565,0.3718],[0.5706,0.3896],[0.5767,0.4072],[0.5834,0.4246],[0.5909,0.4418],[0.5991,0.4585],[0.6081,0.4748],[0.6182,0.4905],[0.6289,0.5058],[0.6401,0.5207],[0.6517,0.5354],[0.6637,0.5496],[0.6762,0.5635],[0.689,0.577],[0.7022,0.5902],[0.7157,0.6031],[0.7294,0.6158],[0.7431,0.6285],[0.7568,0.6412],[0.7702,0.6542],[0.7831,0.6677],[0.7952,0.6819],[0.8062,0.6969],[0.8161,0.7127],[0.8246,0.7293],[0.8318,0.7466],[0.8376,0.7643],[0.8423,0.7823],[0.8458,0.8007],[0.848,0.8192],[0.8491,0.8378],[0.8488,0.8565],[0.8474,0.8751],[0.8447,0.8935],[0.8409,0.9118],[0.836,0.9298],[0.8299,0.9474],[0.8228,0.9647],[0.8146,0.9814],[0.8051,0.9975]],[[0.5299,0.0026],[0.53,0.0214],[0.5304,0.0402],[0.5311,0.059],[0.532,0.0778],[0.533,0.0966],[0.5343,0.1154],[0.5358,0.1342],[0.5374,0.1529],[0.5394,0.1716],[0.5415,0.1903],[0.5438,0.209],[0.5465,0.2277],[0.5494,0.2462],[0.5525,0.2648],[0.556,0.2833],[0.5598,0.3017],[0.564,0.3201],[0.5685,0.3383],[0.5736,0.3565],[0.579,0.3745],[0.5851,0.3923],[0.5916,0.4099],[0.5989,0.4273],[0.607,0.4443],[0.6159,0.4609],[0.6257,0.4769],[0.6367,0.4922],[0.6484,0.507],[0.6604,0.5214],[0.6728,0.5356],[0.6856,0.5494],[0.6988,0.5628],[0.7123,0.576],[0.726,0.5888],[0.74,0.6014],[0.7541,0.6139],[0.7682,0.6264],[0.7822,0.639],[0.7958,0.6519],[0.8089,0.6654],[0.8213,0.6796],[0.8326,0.6946],[0.8427,0.7105],[0.8515,0.7272],[0.8589,0.7445],[0.8649,0.7623],[0.8698,0.7805],[0.8734,0.7989],[0.8758,0.8176],[0.8769,0.8364],[0.8768,0.8552],[0.8754,0.874],[0.8728,0.8926],[0.869,0.911],[0.864,0.9292],[0.858,0.947],[0.8508,0.9644],[0.8426,0.9813],[0.833,0.9975]],[[0.3373,0.0035],[0.3349,0.0243],[0.3323,0.0451],[0.3293,0.0659],[0.3261,0.0867],[0.3226,0.1073],[0.3189,0.128],[0.315,0.1486],[0.3108,0.1692],[0.3063,0.1897],[0.3015,0.2101],[0.2965,0.2305],[0.2911,0.2507],[0.2854,0.2709],[0.2793,0.291],[0.2728,0.311],[0.2659,0.3308],[0.2586,0.3505],[0.2508,0.3699],[0.2424,0.3892],[0.2333,0.4081],[0.2234,0.4266],[0.212,0.4442],[0.1991,0.4608],[0.1851,0.4763],[0.1701,0.491],[0.1543,0.5048],[0.1379,0.5179],[0.121,0.5303],[0.1037,0.5422],[0.0861,0.5537],[0.0683,0.5648],[0.0503,0.5755],[0.0322,0.5861],[0.0139,0.5965],[-0.0043,0.6068],[-0.0226,0.6171],[-0.0408,0.6275],[-0.059,0.638],[-0.077,0.6488],[-0.0948,0.6599],[-0.1123,0.6714],[-0.1295,0.6835],[-0.146,0.6964],[-0.1619,0.7102],[-0.1766,0.7251],[-0.1899,0.7413],[-0.2011,0.759],[-0.2097,0.7782],[-0.2161,0.7982],[-0.221,0.8185],[-0.2244,0.8392],[-0.2261,0.8602],[-0.2259,0.8811],[-0.2238,0.902],[-0.2198,0.9226],[-0.2138,0.9427],[-0.2057,0.962],[-0.1957,0.9805],[-0.1835,0.9975]],[[0.6272,0.0035],[0.6306,0.0249],[0.6346,0.0462],[0.6391,0.0675],[0.6439,0.0887],[0.6492,0.1097],[0.6548,0.1307],[0.6608,0.1516],[0.6671,0.1723],[0.6739,0.1929],[0.6811,0.2134],[0.6887,0.2338],[0.6968,0.2539],[0.7054,0.2739],[0.7144,0.2936],[0.724,0.3131],[0.7342,0.3323],[0.7449,0.3512],[0.7562,0.3697],[0.7682,0.3878],[0.7809,0.4053],[0.7944,0.4223],[0.8089,0.4386],[0.8242,0.4539],[0.8403,0.4685],[0.857,0.4824],[0.8742,0.4956],[0.8918,0.5083],[0.9098,0.5205],[0.9281,0.5322],[0.9465,0.5436],[0.9652,0.5547],[0.984,0.5656],[1.0029,0.5763],[1.0218,0.5869],[1.0408,0.5974],[1.0598,0.6079],[1.0788,0.6185],[1.0976,0.6293],[1.1164,0.6402],[1.1349,0.6515],[1.1531,0.6633],[1.1711,0.6756],[1.1884,0.6886],[1.2051,0.7025],[1.2208,0.7174],[1.2352,0.7337],[1.2476,0.7515],[1.2575,0.7708],[1.2648,0.7912],[1.2705,0.8122],[1.2745,0.8335],[1.2767,0.8551],[1.277,0.8768],[1.2752,0.8984],[1.2713,0.9198],[1.2653,0.9406],[1.2572,0.9607],[1.247,0.9799],[1.2343,0.9975]],[[0.6317,0.0046],[0.6351,0.0263],[0.639,0.0479],[0.6435,0.0695],[0.6484,0.0909],[0.6538,0.1122],[0.6596,0.1334],[0.6659,0.1545],[0.6726,0.1754],[0.6798,0.1962],[0.6874,0.2168],[0.6956,0.2372],[0.7044,0.2574],[0.7136,0.2773],[0.7235,0.297],[0.734,0.3163],[0.7451,0.3353],[0.7569,0.3538],[0.7694,0.3719],[0.7826,0.3895],[0.7967,0.4064],[0.8115,0.4226],[0.8273,0.4379],[0.8437,0.4525],[0.8607,0.4665],[0.8782,0.4798],[0.8961,0.4925],[0.9144,0.5048],[0.9329,0.5167],[0.9516,0.5282],[0.9705,0.5394],[0.9895,0.5504],[1.0087,0.5612],[1.0279,0.5719],[1.0472,0.5826],[1.0664,0.5932],[1.0857,0.6038],[1.1048,0.6145],[1.1239,0.6254],[1.1429,0.6366],[1.1616,0.6481],[1.1801,0.66],[1.1982,0.6724],[1.2159,0.6856],[1.2328,0.6995],[1.2488,0.7146],[1.2636,0.7309],[1.2766,0.7486],[1.287,0.7679],[1.2947,0.7886],[1.3005,0.8097],[1.3048,0.8313],[1.3072,0.8531],[1.3077,0.8751],[1.306,0.897],[1.3022,0.9187],[1.2962,0.9398],[1.2881,0.9602],[1.2777,0.9796],[1.265,0.9975]],[[0.3066,0.0035],[0.3031,0.0265],[0.2988,0.0493],[0.294,0.0721],[0.2887,0.0947],[0.2829,0.1173],[0.2766,0.1397],[0.2699,0.1619],[0.2627,0.184],[0.255,0.206],[0.2468,0.2277],[0.2381,0.2493],[0.2289,0.2707],[0.2192,0.2918],[0.2089,0.3127],[0.1981,0.3332],[0.1866,0.3535],[0.1746,0.3734],[0.162,0.393],[0.1487,0.4121],[0.1346,0.4306],[0.119,0.4478],[0.1022,0.4639],[0.0845,0.479],[0.066,0.4929],[0.0468,0.5061],[0.0271,0.5185],[0.007,0.5302],[-0.0135,0.5413],[-0.0342,0.5518],[-0.0551,0.5619],[-0.0763,0.5717],[-0.0975,0.5811],[-0.1189,0.5903],[-0.1403,0.5993],[-0.1618,0.6082],[-0.1833,0.617],[-0.2049,0.6259],[-0.2263,0.6348],[-0.2478,0.6438],[-0.2691,0.6531],[-0.2903,0.6627],[-0.3112,0.6728],[-0.3319,0.6836],[-0.3521,0.6951],[-0.3716,0.7077],[-0.3901,0.7217],[-0.4071,0.7376],[-0.4216,0.7558],[-0.432,0.7765],[-0.4392,0.7986],[-0.4445,0.8213],[-0.448,0.8443],[-0.4492,0.8675],[-0.4482,0.8907],[-0.4448,0.9137],[-0.4389,0.9362],[-0.4306,0.9579],[-0.4199,0.9785],[-0.4065,0.9975]],[[0.6468,0.0022],[0.6503,0.0258],[0.6547,0.0492],[0.6597,0.0725],[0.6654,0.0956],[0.6717,0.1186],[0.6786,0.1414],[0.6861,0.1639],[0.6943,0.1863],[0.7031,0.2085],[0.7125,0.2303],[0.7226,0.2519],[0.7335,0.2731],[0.745,0.294],[0.7573,0.3143],[0.7703,0.3343],[0.7841,0.3537],[0.7987,0.3725],[0.8141,0.3906],[0.8304,0.408],[0.8475,0.4246],[0.8656,0.4401],[0.8845,0.4546],[0.904,0.4683],[0.924,0.4812],[0.9444,0.4935],[0.9652,0.5052],[0.9862,0.5164],[1.0074,0.5272],[1.0288,0.5377],[1.0503,0.5478],[1.072,0.5577],[1.0937,0.5674],[1.1155,0.577],[1.1374,0.5865],[1.1592,0.596],[1.1811,0.6055],[1.2029,0.6151],[1.2246,0.6247],[1.2463,0.6346],[1.2679,0.6448],[1.2892,0.6553],[1.3103,0.6663],[1.3311,0.678],[1.3514,0.6904],[1.371,0.7039],[1.3897,0.7187],[1.4068,0.7353],[1.4214,0.754],[1.4324,0.7751],[1.4398,0.7977],[1.4451,0.8209],[1.4484,0.8445],[1.4492,0.8683],[1.4476,0.8921],[1.4434,0.9155],[1.4366,0.9383],[1.4273,0.9603],[1.4156,0.981],[1.4013,1]]];
+</script>
+<script>
+/* ============================================================
+   Deterministic hash (stable node layout across reloads)
+   ============================================================ */
+function frac(x){ return x - Math.floor(x); }
+function hsh(n){ return frac(Math.sin(n * 127.1) * 43758.5453); }
+function smoothstep(a, b, x){ const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+function easeOut(x){ return 1 - Math.pow(1 - x, 3); }
+
+/* ============================================================
+   Node + edge model — flat 2D, generated once in a unitless
+   horizontal band, mapped to canvas pixels each frame.
+   Model space: x ∈ [-1, 1], y ∈ band. Each node carries a `birth`
+   threshold (distance from centre) so the network grows outward
+   from the middle as the scroll-driven growth factor increases.
+   ============================================================ */
+const N_SPINE    = 12;
+const N_FILL     = 130;
+const N_CLUSTERS = 12;       // sub-clusters (centre + satellites), weighted toward the middle
+const nodes = [];            // {mx, my, size, birth}
+const edges = [];            // {a, b}
+
+function buildModel() {
+  // spine — primary nodes across the horizontal axis
+  for (let i = 0; i < N_SPINE; i++) {
+    const mx = (-1 + (i / (N_SPINE - 1)) * 2) * 0.9 + (hsh(i + 3) - 0.5) * 0.12;
+    const my = (hsh(i + 9) - 0.5) * 0.20;
+    nodes.push({ mx, my, size: 2.2 + hsh(i) * 0.8 });
+  }
+  // ambient filler — taller vertical spread than before
+  for (let k = 0; k < N_FILL; k++) {
+    // centrally-weighted x: dense in the middle, sparse dispersed tails at
+    // both ends (so neither edge stops at a hard line)
+    const u = hsh(k * 1.7 + 1) * 2 - 1;                       // -1..1
+    const mx = Math.sign(u) * Math.pow(Math.abs(u), 1.3) * 0.98;
+    let my = (hsh(k * 2.3 + 11) - 0.5) * 1.0;
+    my *= 0.55 + 0.45 * Math.abs(my);
+    const edgeFade = 1 - 0.35 * Math.min(1, Math.abs(mx));    // nodes shrink toward the edges → dissolve
+    nodes.push({ mx, my, size: (1.0 + hsh(k + 5) * 1.0) * edgeFade });
+  }
+  // sub-clusters — a centre node with satellites, spokes and a ring, echoing
+  // the original's cluster structure and adding vertical connectors
+  const explicit = [];
+  for (let c = 0; c < N_CLUSTERS; c++) {
+    // centrally-weighted x → more clusters concentrated around the middle
+    const cu = (c / (N_CLUSTERS - 1)) * 2 - 1;             // -1..1
+    const cmx = Math.sign(cu) * Math.pow(Math.abs(cu), 1.5) * 0.72 + (hsh(c * 3.7) - 0.5) * 0.12;
+    const cmy = (hsh(c * 5.1 + 2) - 0.5) * 0.62;
+    const ci = nodes.length;
+    nodes.push({ mx: cmx, my: cmy, size: 2.4 + hsh(c) * 0.9, cl: true });
+    const nSat = 8 + Math.floor(hsh(c * 2.3) * 5);          // 8–12 satellites
+    const sat = [];
+    for (let s = 0; s < nSat; s++) {
+      const ang = (s / nSat) * Math.PI * 2 + hsh(c * 7 + s) * 0.8;
+      const rad = 0.12 + hsh(c * 11 + s) * 0.12;            // longer spokes so the burst reads
+      const smx = cmx + Math.cos(ang) * rad;
+      const smy = cmy + Math.sin(ang) * rad * 1.3;          // emphasise vertical spread
+      const si = nodes.length;
+      nodes.push({ mx: smx, my: smy, size: 0.9 + hsh(si) * 0.8, cl: true });
+      sat.push(si);
+      explicit.push([ci, si]);                              // spoke
+    }
+    for (let s = 0; s < sat.length; s++) explicit.push([sat[s], sat[(s + 1) % sat.length]]);
+  }
+
+  const N = nodes.length;
+  // birth threshold ∈ [0,1] — nearer the centre = born earlier (grows outward)
+  for (let i = 0; i < N; i++) {
+    const dist = Math.min(1, Math.hypot(nodes[i].mx, nodes[i].my * 0.45));
+    let b = dist * 0.88 + (hsh(i * 1.9 + 4) - 0.5) * 0.12;
+    if (nodes[i].cl) b = Math.min(b, 0.5);    // clusters reliably appear by mid-growth
+    nodes[i].birth = Math.max(0, Math.min(0.92, b));
+  }
+  // nearest-3 neighbour edges (lighter y-weight → more vertical connectors)
+  const seen = new Set();
+  function link(i, j, spoke) { const key = Math.min(i, j) + '_' + Math.max(i, j);
+    if (!seen.has(key)) { seen.add(key); edges.push({ a: i, b: j, spoke: !!spoke }); } }
+  for (let i = 0; i < N; i++) {
+    const a = nodes[i]; const d = [];
+    for (let j = 0; j < N; j++) {
+      if (j === i) continue;
+      const dx = nodes[j].mx - a.mx, dy = (nodes[j].my - a.my) * 1.35;
+      d.push([dx * dx + dy * dy, j]);
+    }
+    d.sort((p, q) => p[0] - q[0]);
+    for (let n = 0; n < 3; n++) link(i, d[n][1]);
+  }
+  for (const [a, b] of explicit) link(a, b, true);   // cluster spokes/rings — rendered brighter
+}
+buildModel();
+
+/* ---- pulses: bright dots travelling along edges ("queries firing") ---- */
+const NPULSE = 90;
+const pulses = [];
+for (let i = 0; i < NPULSE; i++) {
+  pulses.push({ e: Math.floor(Math.random() * edges.length), t: Math.random(),
+    dir: Math.random() < 0.5 ? 1 : -1, spd: 0.35 + Math.random() * 0.7 });
+}
+
+/* ============================================================
+   Canvas + logo setup
+   ============================================================ */
+const canvas = document.getElementById('ontologyCanvas');
+const ctx = canvas.getContext('2d');
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const logo = new Image();
+let logoReady = false;
+logo.onload = () => { logoReady = true; };
+logo.src = 'images/mm_indent.png';
+
+/* DOM refs (declared once, up front — updateGround uses them) */
+const stage = document.querySelector('.stage');
+const refineryLayer = document.getElementById('refineryLayer');
+const trayLayer = document.getElementById('trayLayer');
+const groundLine = document.getElementById('groundLine');
+const groundGrad = document.getElementById('groundGrad');
+const obsLabel = document.getElementById('obsLabel');
+const actLabel = document.getElementById('actLabel');
+const refineryImg = refineryLayer.querySelector('img');
+
+let W = 0, H = 0, cx = 0, cy = 0, sx = 1, sy = 1;
+const FRAME_MS = 1000 / 30;
+const DPR_CAP = 1.5;
+
+/* ============================================================
+   Tray stream-line particles — glowing pulses of light that
+   travel DOWN the curved streamlines of the tray. Paths are
+   cubic-beziers matching the tray ribs; each particle has
+   randomised spawn/speed/size/opacity/delay so the motion stays
+   organic and unsynchronised. Additive ('lighter') for glow.
+   ============================================================ */
+const trayFlow = document.getElementById('trayFlow');
+const tctx = trayFlow.getContext('2d');
+let TW = 0, THh = 0;
+
+// cached soft radial-glow sprite (fast — drawn per particle instead of shadowBlur)
+const glowSprite = document.createElement('canvas'); glowSprite.width = glowSprite.height = 64;
+(function () {
+  const g = glowSprite.getContext('2d');
+  const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  rg.addColorStop(0, 'rgba(255,255,255,1)');
+  rg.addColorStop(0.25, 'rgba(255,255,255,0.85)');
+  rg.addColorStop(0.5, 'rgba(255,255,255,0.28)');
+  rg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
+})();
+
+// streamline paths — accurate polylines derived from the tray's own SVG (pathref.svg),
+// arc-length resampled. Normalised: y 0..1 = rib top..bottom; x centred ~0.5, aspect-preserved.
+const trayPaths = (window.RIB_PATHS && window.RIB_PATHS.length) ? window.RIB_PATHS : [[[0.5,0],[0.5,1]]];
+
+// Registration of the rib artwork onto the tray box. Rib HEIGHT maps to the tray box
+// height; the x-scale uses the same factor so curve shapes stay undistorted.
+// Live-adjustable registration. To align with the PNG, open the page with #tune in the
+// URL (e.g. proto-ontology.html#tune) for an on-screen tuner, or set values in DevTools
+// via window.RIB (e.g. RIB.xpx = 8). xpx/ypx = pixel nudges, xscale/yscale = stretch.
+const RIB = window.RIB = { xscale: 1.0, yscale: 1.0, xpx: 8, ypx: 0, debug: false };
+function ribPoint(path, t) {                       // sample the polyline at t∈[0,1]
+  const f = t * (path.length - 1);
+  const i0 = Math.min(path.length - 2, Math.max(0, Math.floor(f)));
+  const fr = f - i0;
+  const nx = path[i0][0] + (path[i0 + 1][0] - path[i0][0]) * fr;
+  const ny = path[i0][1] + (path[i0 + 1][1] - path[i0][1]) * fr;
+  return [
+    TW * 0.5 + (nx - 0.5) * THh * RIB.xscale + RIB.xpx,
+    ny * THh * RIB.yscale + RIB.ypx
+  ];
+}
+
+// per-rib weight — spawn fewer particles on the far-left/right (outer) ribs
+const ribMaxDev = trayPaths.map(p => { let md = 0; for (const q of p) { const d = Math.abs(q[0] - 0.5); if (d > md) md = d; } return md; });
+const pathW = ribMaxDev.map(md => Math.max(0.10, 1 - Math.pow(Math.min(1, md / 0.95), 1.3)));
+const pathWsum = pathW.reduce((a, b) => a + b, 0);
+function pickPath() { let r = Math.random() * pathWsum; for (let i = 0; i < pathW.length; i++) { r -= pathW[i]; if (r <= 0) return i; } return pathW.length - 1; }
+
+const N_TRAY = 46;
+const trayParts = [];
+function spawnTray(p, initial) {
+  p.path = pickPath();
+  p.t    = initial ? Math.random() : 0;
+  p.spd  = 0.10 + Math.random() * 0.20;               // travel speed (raise to go faster)
+  p.size = 0.45 + Math.random() * 0.8;                // very small nodes
+  p.op   = 0.45 + Math.random() * 0.55;
+  p.wait = initial ? Math.random() * 4.5 : 0.4 + Math.random() * 3.0;   // staggered respawn
+}
+for (let i = 0; i < N_TRAY; i++) { const p = {}; spawnTray(p, true); trayParts.push(p); }
+
+function sizeTrayFlow() {
+  const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+  const box = trayFlow.getBoundingClientRect();
+  TW = box.width; THh = box.height;
+  if (TW < 2 || THh < 2) return;
+  trayFlow.width = Math.max(1, Math.round(TW * dpr));
+  trayFlow.height = Math.max(1, Math.round(THh * dpr));
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function drawTrayFlow(t, dt) {
+  if (TW < 2 || THh < 2) { sizeTrayFlow(); if (TW < 2 || THh < 2) return; }
+  tctx.clearRect(0, 0, TW, THh);
+  if (RIB.debug) {                                   // alignment aid — draw rib polylines
+    tctx.strokeStyle = 'rgba(255,90,90,0.7)'; tctx.lineWidth = 1;
+    for (const path of trayPaths) { tctx.beginPath();
+      for (let i = 0; i < path.length; i++) { const q = ribPoint(path, i / (path.length - 1)); i ? tctx.lineTo(q[0], q[1]) : tctx.moveTo(q[0], q[1]); }
+      tctx.stroke(); }
+  }
+  const gs = Math.max(0.65, THh / 320);
+  tctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < N_TRAY; i++) {
+    const p = trayParts[i];
+    if (p.wait > 0) { p.wait -= dt; continue; }
+    p.t += p.spd * dt;
+    if (p.t >= 1) { spawnTray(p, false); continue; }
+    const q = ribPoint(trayPaths[p.path], p.t);
+    const x = q[0], y = q[1];
+    const a = p.op * smoothstep(0.10, 0.26, p.t) * (1 - smoothstep(0.80, 1.0, p.t));  // fade in below the logo, out at base
+    if (a <= 0.01) continue;
+    const gr = (p.size + 0.9) * 1.9 * gs;                 // soft outer glow (smaller)
+    tctx.globalAlpha = a * 0.5;
+    tctx.drawImage(glowSprite, x - gr, y - gr, gr * 2, gr * 2);
+    const cr = p.size * 1.2 * gs;                          // bright core (very small)
+    tctx.globalAlpha = a;
+    tctx.drawImage(glowSprite, x - cr, y - cr, cr * 2, cr * 2);
+  }
+  tctx.globalAlpha = 1;
+  tctx.globalCompositeOperation = 'source-over';
+}
+
+/* On-screen tuner for aligning the ribs to the tray PNG.
+   Activate by loading the page with #tune in the URL (proto-ontology.html#tune). */
+function buildRibTuner() {
+  if (!/tune/.test(location.hash)) return;
+  RIB.debug = true;
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;top:12px;right:12px;z-index:99999;background:rgba(8,8,14,.92);color:#fff;font:12px/1.6 monospace;padding:10px 12px;border:1px solid #333;border-radius:8px;width:200px;';
+  const fields = [['xpx','X shift (px)',1],['ypx','Y shift (px)',1],['xscale','X scale',0.005],['yscale','Y scale',0.005]];
+  let html = '<div style="margin-bottom:6px;letter-spacing:.12em;opacity:.65">RIB TUNER</div>'
+    + '<label style="display:flex;gap:6px;align-items:center;margin:5px 0"><input type="checkbox" id="ribDbg" checked> show rib lines</label>';
+  for (const [k,label,step] of fields)
+    html += '<label style="display:flex;justify-content:space-between;gap:8px;margin:5px 0">' + label
+      + '<input type="number" id="rib_' + k + '" value="' + RIB[k] + '" step="' + step
+      + '" style="width:74px;background:#000;color:#fff;border:1px solid #444;border-radius:4px;padding:2px 4px"></label>';
+  html += '<div id="ribOut" style="margin-top:8px;opacity:.6;word-break:break-all"></div>';
+  box.innerHTML = html;
+  document.body.appendChild(box);
+  const out = box.querySelector('#ribOut');
+  const upd = () => { out.textContent = 'xscale:' + RIB.xscale + ', yscale:' + RIB.yscale + ', xpx:' + RIB.xpx + ', ypx:' + RIB.ypx; };
+  box.querySelector('#ribDbg').addEventListener('change', e => { RIB.debug = e.target.checked; });
+  for (const [k] of fields) box.querySelector('#rib_' + k).addEventListener('input', e => { RIB[k] = parseFloat(e.target.value) || 0; upd(); });
+  upd();
+}
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+  const cssW = canvas.offsetWidth, cssH = canvas.offsetHeight;
+  canvas.width = Math.max(1, cssW * dpr);
+  canvas.height = Math.max(1, cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  W = cssW; H = cssH; cx = W / 2; cy = H / 2;
+  // model → screen: tightened band to match the reference scale
+  sx = W * 0.346;              // width +20%
+  sy = Math.min(H * 0.260, W * 0.122);   // depth (vertical) reduced a further 10%
+  updateGround();
+  sizeTrayFlow();
+}
+function SXp(mx) { return cx + mx * sx; }
+function SYp(my) { return cy + my * sy; }
+
+/* Ground line = the refinery base. The node band centres on it (50% above,
+   50% below), and the line / gradient / labels / tray all anchor to it. */
+let groundY = 0;
+const OBS_OFFSET = 34, ACT_OFFSET = 14;      // labels straddle the line
+const GROUND_FRAC  = 0.58;                    // horizon as a fraction of stage height
+const REF_OVERHANG = 0.13;                    // refinery base sits on the line (0.12 gap, 0.15 slightly under, 0.22 overshot) — tunable
+const TRAY_RISE    = 34;                      // tray lifted so its top sits under the logo — tunable
+function updateGround() {
+  groundY = H * GROUND_FRAC;
+  cy = groundY;                               // node band centres on the ground line
+  // refinery bottom-anchored so its structure base sits on the line; the
+  // overhang tucks the PNG's transparent bottom padding below the line and
+  // removes the black gap between the refinery and the ground.
+  const dispH = refineryLayer.getBoundingClientRect().height || H * 0.35;
+  refineryLayer.style.top = (groundY + dispH * REF_OVERHANG - dispH) + 'px';
+  refineryLayer.style.transform = 'translateX(-50%)';
+  groundLine.style.top = groundY + 'px';
+  groundGrad.style.top = groundY + 'px';
+  obsLabel.style.top = (groundY - OBS_OFFSET) + 'px';
+  actLabel.style.top = (groundY + ACT_OFFSET) + 'px';
+  trayLayer.style.top = (groundY - TRAY_RISE) + 'px';   // lifted so its top sits under the logo
+}
+
+/* ============================================================
+   Scroll-driven reveal state (set by onScrollUpdate, read in draw)
+   ============================================================ */
+let growth = 0;              // 0→1, drives outward node/edge growth
+let logoReveal = 0;          // 0→1, centre M-mark fade-in
+
+/* ---- heartbeat: periodic double-thump like the original ---- */
+function heartbeat(t) {
+  const p = (t % 1.4) / 1.4;
+  const a = Math.exp(-Math.pow(p / 0.05, 2));
+  const b = 0.55 * Math.exp(-Math.pow((p - 0.18) / 0.06, 2));
+  return Math.min(1, a + b);
+}
+
+/* ============================================================
+   Playback — pulses/twinkle/heartbeat are time-based; the network
+   grow-in is scroll-based. IntersectionObserver pauses off-screen.
+   ============================================================ */
+let running = false, started = false, onScreen = false, tabHidden = false;
+let last = 0, lastFrame = 0;
+
+function tick(now) {
+  if (!running) return;
+  requestAnimationFrame(tick);
+  if (now - lastFrame < FRAME_MS) return;
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now; lastFrame = now;
+  draw(now / 1000, dt);
+  drawTrayFlow(now / 1000, dt);
+}
+
+function draw(t, dt) {
+  ctx.clearRect(0, 0, W, H);
+  const N = nodes.length;
+  const hb = heartbeat(t);
+
+  // per-node visibility from scroll growth (grows outward from centre)
+  const vis = new Float32Array(N), fx = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    vis[i] = easeOut(smoothstep(nodes[i].birth, nodes[i].birth + 0.16, growth));
+    // horizontal taper — nodes/lines dissolve toward both edges. Symmetric
+    // now that the extreme-edge material has been pulled inward, so both
+    // sides balance.
+    fx[i] = 1 - smoothstep(0.50, 0.95, Math.abs(nodes[i].mx));
+  }
+
+  // --- edges ---
+  ctx.lineWidth = 1;
+  for (let i = 0; i < edges.length; i++) {
+    const ea = edges[i].a, eb = edges[i].b;
+    const grow = Math.min(vis[ea], vis[eb]);
+    if (grow <= 0.01) continue;
+    const a = grow * Math.min(fx[ea], fx[eb]);   // horizontal taper toward both edges
+    if (a <= 0.01) continue;
+    const A = nodes[ea], B = nodes[eb];
+    // each endpoint grows out from centre by its own visibility
+    const ax = SXp(A.mx * vis[ea]), ay = SYp(A.my * vis[ea]);
+    const bx = SXp(B.mx * vis[eb]), by = SYp(B.my * vis[eb]);
+    const base = edges[i].spoke ? 0.20 : 0.10;   // cluster spokes read brighter
+    ctx.strokeStyle = `rgba(255,255,255,${((base + 0.05 * hb) * a).toFixed(3)})`;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  }
+
+  // --- nodes ---
+  for (let i = 0; i < N; i++) {
+    const e = vis[i];
+    if (e <= 0.01 || fx[i] <= 0.01) continue;
+    const x = SXp(nodes[i].mx * e), y = SYp(nodes[i].my * e);
+    const tw = 0.6 + 0.4 * Math.sin(t * (0.6 + hsh(i) * 1.2) + hsh(i + 2) * 6.28);
+    const a = (0.6 * tw + 0.18 * hb) * e * fx[i];   // horizontal taper toward both edges
+    ctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(x, y, nodes[i].size, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // --- pulses ---
+  for (let i = 0; i < NPULSE; i++) {
+    const p = pulses[i];
+    p.t += p.dir * p.spd * dt;
+    if (p.t < 0 || p.t > 1) {
+      p.e = Math.floor(Math.random() * edges.length);
+      p.t = Math.random() < 0.5 ? 0 : 1;
+      p.dir = p.t === 0 ? 1 : -1;
+      p.spd = 0.35 + Math.random() * 0.7;
+    }
+    const ed = edges[p.e], A = nodes[ed.a], B = nodes[ed.b];
+    const grow = Math.min(vis[ed.a], vis[ed.b]);
+    const fade = Math.min(fx[ed.a], fx[ed.b]);   // horizontal taper toward both edges
+    const e = grow * fade;
+    if (e <= 0.05) continue;
+    const mx = A.mx + (B.mx - A.mx) * p.t;
+    const my = A.my + (B.my - A.my) * p.t;
+    const x = SXp(mx * grow), y = SYp(my * grow);
+    ctx.fillStyle = `rgba(255,255,255,${(0.28 * e).toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${(0.95 * e).toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // --- centre M-mark (heart), with heartbeat scale/alpha pulse ---
+  if (logoReady && logoReveal > 0.01) {
+    const ls = Math.min(W, H) * 0.072 * (1 + 0.03 * hb);
+    ctx.globalAlpha = logoReveal * (0.82 + 0.18 * hb);
+    ctx.drawImage(logo, cx - ls / 2, cy - ls / 2, ls, ls);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ============================================================
+   Scroll-driven layer reveal: refinery (fast) → ontology grow →
+   tray (top→bottom clip, as if feeding outward from the ontology)
+   ============================================================ */
+const scrollSpace = document.querySelector('.scroll-space');
+function ramp(p, a, b) { return Math.max(0, Math.min(1, (p - a) / (b - a))); }
+
+let scrollTicking = false;
+function onScrollUpdate() {
+  const rect = scrollSpace.getBoundingClientRect();
+  const total = rect.height - window.innerHeight;
+  const p = Math.max(0, Math.min(1, -rect.top / total));
+
+  refineryLayer.style.opacity = ramp(p, 0.03, 0.13).toFixed(3);   // fast fade-in first
+  canvas.style.opacity        = ramp(p, 0.13, 0.20).toFixed(3);   // node layer switches on
+  logoReveal                  = ramp(p, 0.14, 0.26);              // centre mark appears early
+  growth                      = ramp(p, 0.18, 0.66);              // network grows outward, bit by bit
+
+  // ground line extends left → right; the maroon gradient fades in beneath it
+  const lineReveal = ramp(p, 0.30, 0.56);
+  groundLine.style.transform = `scaleX(${lineReveal.toFixed(4)})`;
+  groundGrad.style.opacity = ramp(p, 0.34, 0.58).toFixed(3);
+
+  // OBSERVATION then ACTION, one at a time at the end of the reveal.
+  // OBSERVATION elevates UP from the ground line to its rest position above;
+  // ACTION lowers DOWN under the ground line to its rest position below.
+  // Both start on the line (translateY back to groundY) and ease out to rest.
+  const obsE = easeOut(ramp(p, 0.60, 0.72));
+  obsLabel.style.opacity = ramp(p, 0.60, 0.68).toFixed(3);
+  obsLabel.style.transform = `translateY(${(OBS_OFFSET * (1 - obsE)).toFixed(2)}px)`;
+  const actE = easeOut(ramp(p, 0.72, 0.84));
+  actLabel.style.opacity = ramp(p, 0.72, 0.80).toFixed(3);
+  actLabel.style.transform = `translateY(${(-ACT_OFFSET * (1 - actE)).toFixed(2)}px)`;
+
+  // tray reveals top→bottom: bottom inset shrinks 100%→0% (feeds down from ground)
+  const trayReveal = ramp(p, 0.56, 0.88);
+  trayLayer.style.clipPath = `inset(0 0 ${((1 - trayReveal) * 100).toFixed(2)}% 0)`;
+
+  scrollTicking = false;
+}
+function onScroll() { if (!scrollTicking) { requestAnimationFrame(onScrollUpdate); scrollTicking = true; } }
+
+/* ============================================================
+   Run / pause coordination
+   ============================================================ */
+function maybeRun() {
+  if (!started || tabHidden || !onScreen || reduced) { running = false; return; }
+  if (!running) { running = true; last = performance.now(); lastFrame = 0; requestAnimationFrame(tick); }
+}
+function boot() {
+  resize();
+  // the refinery image drives the ground-line position; recompute once it lays out
+  if (refineryImg.complete && refineryImg.naturalHeight) { updateGround(); onScrollUpdate(); }
+  refineryImg.addEventListener('load', () => { updateGround(); onScrollUpdate(); });
+  // the tray image drives the tray-flow canvas size (its box comes from the img aspect)
+  const trayImgEl = trayLayer.querySelector('img');
+  if (trayImgEl.complete && trayImgEl.naturalHeight) sizeTrayFlow();
+  trayImgEl.addEventListener('load', sizeTrayFlow);
+  window.addEventListener('resize', () => { resize(); onScrollUpdate(); });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  document.addEventListener('visibilitychange', () => { tabHidden = document.hidden; maybeRun(); });
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { onScreen = e.isIntersecting; maybeRun(); });
+    }, { threshold: 0.02 });
+    io.observe(canvas);
+  } else { onScreen = true; }
+  started = true;
+  buildRibTuner();
+  onScrollUpdate();
+  if (reduced) { growth = 1; logoReveal = 1; draw(0, 0); }
+  else maybeRun();
+}
+boot();
+</script>
+</body>
+</html>
