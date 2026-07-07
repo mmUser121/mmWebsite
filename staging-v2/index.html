@@ -52,7 +52,7 @@
   <!-- Google Fonts: Noto Serif Display, Sora, Share Tech Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Display:ital,wght@0,300;0,400;1,300&family=Share+Tech+Mono&family=Sora:wght@100;200;300;400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Serif+Display:ital,wght@0,300;0,400;1,300&family=Share+Tech+Mono&family=Sora:wght@100;200;300;400&display=swap" rel="stylesheet">
 
   <!-- Tailwind theme extension -->
   <script>
@@ -81,7 +81,7 @@
     /* ===========================
        Base
        =========================== */
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; scrollbar-gutter: stable; }
     body {
       background-color: #06060E;
       color: #FFFFFF;
@@ -381,7 +381,9 @@
     .intro-text {
       opacity: 0;
       transform: translateY(8px);
-      animation: line-reveal 1200ms cubic-bezier(.2,.6,.2,1) 2700ms forwards;
+      /* Appears together with the last two words ("physical economy.",
+         which start at 1480ms / 1610ms). */
+      animation: line-reveal 1200ms cubic-bezier(.2,.6,.2,1) 1500ms forwards;
     }
 
     @keyframes line-reveal {
@@ -504,11 +506,16 @@
          portion lets the hero behind read through during the transition;
          by the time the reel is fully in view, the gradient has reached
          its solid stop and the hero is fully covered. */
+      /* Transparent top (0–28%) for the hero transition; solid through the
+         middle; then fades back to transparent at the bottom so the shared
+         curved line reveals gradually instead of being hard-cropped where the
+         solid fill used to end. */
       background: linear-gradient(
         to bottom,
         rgba(6, 6, 14, 0)   0%,
-        rgba(6, 6, 14, 1)  30%,
-        rgba(6, 6, 14, 1) 100%
+        rgba(6, 6, 14, 1)  28%,
+        rgba(6, 6, 14, 1)  50%,
+        rgba(6, 6, 14, 0) 100%
       );
       padding: clamp(40px, 6vw, 100px) 0;
       /* Scroll-linked scale: as the reel scrolls into view, the frame grows
@@ -590,20 +597,31 @@
        Section — "Connected Understanding" (turbine)
        =========================== */
     /* Shared curved line spanning sections 2–4 (feature reel, turbine, ontology).
-       The band deliberately has NO overflow and NO z-index of its own: overflow
-       would break the sticky ontology stage, and a stacking context would
-       disturb the hero→reel transition. The curve sits at z-0; each section sits
-       above it (z-index ≥ 1) with a transparent background. Desktop only;
-       position/scale are tunable via the --curve-* custom properties. */
-    .curve-band { position: relative; }
+       No z-index of its own (a stacking context would disturb the hero→reel
+       transition). `overflow-x: clip` clips the curve's horizontal overflow
+       (killing page-wide horizontal scroll) WITHOUT creating a scroll container
+       — so, unlike `overflow: hidden`, it doesn't break the sticky ontology
+       stage. The curve sits at z-0; each section sits above it (z-index ≥ 1)
+       with a transparent background. Position/scale tunable via --curve-* vars. */
+    .curve-band {
+      position: relative;
+      overflow-x: clip;
+    }
     .page-curve {
       display: none;
       position: absolute;
-      top: var(--curve-top, 6vh);
+      /* Vertical offset lives in `top` (not the transform) so the JS pin can
+         override it cleanly; horizontal stays in the transform. JS replaces
+         `top` at runtime to keep the curve locked to the turbine. */
+      top: calc(var(--curve-top, 6vh) + var(--curve-dy, 0px));
       left: 50%;
       width: var(--curve-w, 1300px);
       height: auto;                 /* keep the SVG's natural ratio */
-      transform: translateX(-50%) translate(var(--curve-dx, 0px), var(--curve-dy, 0px));
+      aspect-ratio: 1482.863 / 2085.958;  /* pin ratio so height is identical cross-browser */
+      --curve-w: 1140px;            /* desktop position (tuned) */
+      --curve-dx: 220px;
+      --curve-dy: 665px;            /* fallback only; JS pins to the turbine on desktop */
+      transform: translateX(-50%) translateX(var(--curve-dx, 0px));
       z-index: 0;
       pointer-events: none;
       opacity: 0.85;
@@ -630,7 +648,12 @@
     }
     .ci-heading .ci-em { font-style: italic; }
     .ci-text { max-width: 46ch; }
-    .ci-text .body-copy p { font-size: clamp(14px, 1.05vw, 16px); }
+    .ci-text .body-copy p {
+      font-size: clamp(14px, 1.05vw, 16px);
+      /* Narrower than the heading — wraps after the first sentence
+         ("…does not run on language."). Tunable ±2ch. */
+      max-width: 31ch;
+    }
     /* Rise-in reveal — held until .is-revealed is added (when the turbine
        reaches the middle of the viewport), so it doesn't fire on approach. */
     .ci-rise {
@@ -670,6 +693,31 @@
       opacity: 0;
     }
     .turbine-emit { z-index: 2; }   /* emission lines + text — in front of the curved line */
+    /* White MatterMind mark — the "heart" dead-centre of the turbine. mm_192.svg
+       ships black (no fill), so invert it to white. It fades in with the turbine
+       (opacity is JS-driven) and beats via a transform-scale-only heartbeat, so
+       no filter/blend is animated (GPU-composited, cheap). */
+    .ci-mark {
+      position: absolute;
+      inset: 0; margin: auto;
+      width: 9%; height: auto;          /* small scale per the design ref — tunable */
+      z-index: 3;                       /* above turbine image + emission */
+      pointer-events: none;
+      opacity: 0;                       /* ramps in with the turbine reveal (JS) */
+      filter: brightness(0) invert(1);  /* black artwork → white (static, not animated) */
+      transform-origin: center center;
+      animation: ci-heartbeat 1.7s ease-in-out infinite;
+    }
+    /* lub-dub then rest — very subtle (max +5%) */
+    @keyframes ci-heartbeat {
+      0%, 44%, 100% { transform: scale(1); }
+      12%           { transform: scale(1.05); }  /* lub */
+      22%           { transform: scale(1); }
+      32%           { transform: scale(1.03); }  /* dub */
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ci-mark { animation: none; }
+    }
     @media (min-width: 1024px) {
       .section-ci { min-height: 92vh; display: flex; align-items: center; }
       /* width:100% so the flex item fills the line — then max-w-[1280px]
@@ -685,7 +733,9 @@
         margin: 0;
         pointer-events: none;
       }
-      .ci-text { max-width: 560px; position: relative; }
+      /* Container wide enough for the heading's 25ch cap → reliably 3 lines.
+         The body copy is capped separately (narrower) via .ci-text .body-copy p. */
+      .ci-text { max-width: 500px; position: relative; transform: translateY(-50px); }
       /* Character-based cap on the heading → wraps onto ~3 lines and stays 3
          across desktop sizes (ch scales with the heading's own font). */
       .ci-heading { max-width: 25ch; }
@@ -1020,7 +1070,7 @@
        (explicit <br>); wraps naturally on mobile. */
     .install-heading {
       position: absolute;
-      top: clamp(28px, 8vh, 88px);
+      top: calc(clamp(28px, 8vh, 88px) + 50px);   /* dropped 50px lower */
       left: 50%;
       transform: translateX(-50%);
       width: min(90%, 40ch);
@@ -1044,7 +1094,10 @@
        refinery → node field → tray reveal cleanly. */
     .install-scroll {
       position: relative;
-      height: 240vh;
+      /* 180vh → ~80vh of pinned scroll. The reveal finishes by pin ~0.44 and
+         the auto sequence fires at 0.48; the shorter section trims the "dead"
+         pinned scroll after that so it unlocks to Section 5 sooner. */
+      height: 180vh;
     }
     .install-stage {
       position: sticky;
@@ -1077,6 +1130,35 @@
       width: min(1040px, 66vw);
       z-index: 3;
       opacity: 0;
+    }
+    /* Tower-top beacons. Positioned + sized as a % of the refinery layer, so
+       they stay locked to the tower tops at any refinery scale. They live
+       inside #refineryLayer, so they fade in with it. Colour #FFA398 with a
+       layered glow; both share one animation (no delay) so they pulse in sync
+       from full brightness down to ~20%. Opacity-only (perf: no animated filter). */
+    .tower-beacon {
+      position: absolute;
+      width: 0.5%;                 /* ~5px at desktop refinery width; scales with it */
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: #FFA398;
+      transform: translate(-50%, -50%);   /* centre the dot on its coordinate */
+      pointer-events: none;
+      box-shadow:
+        0 0 4px 1px rgba(255, 163, 152, 0.95),
+        0 0 9px 3px rgba(255, 163, 152, 0.6),
+        0 0 16px 6px rgba(255, 163, 152, 0.35);
+      will-change: opacity;
+      animation: beacon-pulse 2.6s ease-in-out infinite;
+    }
+    .beacon-a { left: 30.5%; top: 6%; }    /* left tall chimney  — tunable */
+    .beacon-b { left: 83.65%; top: 12%; }  /* right tall tower   — tunable */
+    @keyframes beacon-pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.2; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .tower-beacon { animation: none; }
     }
     #ontologyCanvas {
       position: absolute;
@@ -1185,11 +1267,47 @@
       padding-left: 0.10em;
       text-transform: uppercase;
     }
-    /* Flow words reveal letter by letter (same glitch treatment as the
-       deep-tech caption, but white-only). Per-letter delay set inline in JS. */
-    .boot-flow .flow-letter {
+    /* "Coming online" status LED — a small #FFA398 indicator (matching the tower
+       beacons) prefixes each unlocked benefit and flicks on (with a micro-
+       flicker) as it energises onto the board. Replaces the old "›" prefix.
+       Sizes/glows in em, so it scales with the benefit text. */
+    .boot-benefit .boot-word::before {
+      content: "";
       display: inline-block;
-      white-space: pre;              /* preserve the space in "Industrial world ›" */
+      width: 0.25em; height: 0.25em;
+      margin-right: 0.5em;
+      vertical-align: 0.2em;           /* nudge onto the cap midline — tunable */
+      border-radius: 50%;
+      background: #FFA398;
+      box-shadow: 0 0 0.15em 0.03em rgba(255, 163, 152, 0.9),
+                  0 0 0.42em 0.10em rgba(255, 163, 152, 0.45);
+      /* strike on (once) then breathe continuously through the item's dwell;
+         breathe is listed last so it owns opacity once led-on hands off. */
+      animation: led-on 450ms ease-out both,
+                 led-breathe 1.6s ease-in-out 450ms infinite;
+    }
+    @keyframes led-on {
+      0%   { opacity: 0;    box-shadow: 0 0 0 0 rgba(255, 163, 152, 0); }
+      16%  { opacity: 1; }              /* strike on */
+      28%  { opacity: 0.35; }           /* micro-flicker */
+      42%  { opacity: 1; }
+      100% { opacity: 0.95;
+             box-shadow: 0 0 0.15em 0.03em rgba(255, 163, 152, 0.9),
+                         0 0 0.42em 0.10em rgba(255, 163, 152, 0.45); }
+    }
+    /* Gentle brightness breathe (opacity dims dot + glow together). */
+    @keyframes led-breathe {
+      0%, 100% { opacity: 0.95; }
+      50%      { opacity: 0.5; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .boot-benefit .boot-word::before { animation: none; opacity: 0.95; }
+    }
+    /* Letter-by-letter glitch reveal — used by the ontology flow words and the
+       philosophy sub-line. Per-letter delay set inline in JS. */
+    .flow-letter {
+      display: inline-block;
+      white-space: pre;              /* preserve spaces */
       opacity: 0;
       animation: flow-letter-in 360ms cubic-bezier(.2, .6, .2, 1) forwards;
     }
@@ -1199,8 +1317,21 @@
       60%  { opacity: 0.3;  transform: translate3d(-1px, 0, 0); }
       100% { opacity: 1;    transform: none; text-shadow: none; }
     }
+    /* Ontology flow words — "charge-up bloom": each letter snaps in with a brief
+       white glow that cools, plus a tiny scale settle. Scoped to .boot-flow so
+       the shared philosophy sub-line keeps the flow-letter-in glitch above.
+       REVERT: delete this rule + the @keyframes below and the flow words fall
+       back to flow-letter-in. */
+    .boot-flow .flow-letter {
+      animation: flow-letter-charge 440ms cubic-bezier(.2, .7, .2, 1) forwards;
+    }
+    @keyframes flow-letter-charge {
+      0%   { opacity: 0; transform: scale(1.22); text-shadow: 0 0 0 rgba(255,255,255,0); }
+      32%  { opacity: 1; transform: scale(1.05); text-shadow: 0 0 12px rgba(255,255,255,0.95), 0 0 24px rgba(255,255,255,0.5); }
+      100% { opacity: 1; transform: scale(1);    text-shadow: none; }
+    }
     @media (prefers-reduced-motion: reduce) {
-      .boot-flow .flow-letter { opacity: 1; animation: none; }
+      .flow-letter { opacity: 1 !important; animation: none !important; }
     }
     /* ===========================
        Section — "We are teaching infrastructure to think"
@@ -1318,7 +1449,7 @@
       position: relative;
       width: 100%;
       height: clamp(240px, 66vw, 400px);
-      background-image: url('images/trust_bloom.jpg');
+      background-image: url('images/trust_bloom.webp');
       background-size: 92% auto;
       background-position: center calc(50% + var(--parallax-y, 0px));
       background-repeat: no-repeat;
@@ -1333,6 +1464,21 @@
         background-size: 64% auto;
       }
     }
+    /* Bright bloom orb (bloom.webp) overlaid on the base scene. Starts small +
+       hidden; JS scales it 20%→100% + fades it in (ease-out). Position/size
+       tunable via the --orb-* vars. */
+    .phil-bloom-orb {
+      position: absolute;
+      left: var(--orb-x, 50%);
+      top: var(--orb-y, 48%);
+      width: var(--orb-w, 27%);
+      height: auto;
+      transform: translate(-50%, -50%) scale(0.2);
+      opacity: 0;
+      z-index: 1;
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
     /* Particle burst canvas — sparks radiate from the bloom centre (drawn in JS,
        over the image, beneath the philosophy text). */
     .phil-particles {
@@ -1342,6 +1488,17 @@
       height: 100%;
       pointer-events: none;
       z-index: 2;
+    }
+    /* Philosophy text is held hidden until the bloom peaks (JS adds .phil-in). */
+    .phil-content {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 800ms cubic-bezier(.2,.6,.2,1), transform 800ms cubic-bezier(.2,.6,.2,1);
+    }
+    .phil-content.phil-in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .phil-content { opacity: 1 !important; transform: none !important; }
+      .phil-bloom-orb { opacity: 1 !important; transform: translate(-50%, -50%) scale(1) !important; }
     }
 
     .section-g {
@@ -1371,11 +1528,29 @@
       line-height: 1.16;
       letter-spacing: -0.005em;
       color: #FFFFFF;
-      max-width: 920px;
+      /* Wide enough that "Operational knowledge becomes measurable efficiency."
+         fits on one line (the <br> then puts "Ownership stays with you." on
+         line two). */
+      max-width: 1150px;
       /* Margin from viewport edge is handled by the section container. */
       padding: 0;
       margin: 0 auto;
       text-shadow: 0 0 16px rgba(6, 6, 14, 0.6);
+    }
+
+    /* Mono sub-line under the philosophy headline (JetBrains Mono), revealed
+       letter-by-letter (same glitch effect as the ontology flow words). */
+    .phil-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+      font-size: clamp(12px, 1.05vw, 15px);
+      line-height: 1.7;
+      letter-spacing: 0.01em;
+      color: rgba(255, 255, 255, 0.72);
+      text-align: center;
+      max-width: none;
+      white-space: nowrap;              /* keep it on a single line (desktop) */
+      margin: clamp(18px, 2.2vw, 30px) auto 0;
     }
 
     /* Highlighted "key" words — italic, white (per the design). */
@@ -1422,7 +1597,7 @@
     /* Plain dark footer (per the design — no line-art background). */
     .section-h {
       position: relative;
-      background-color: #06060E;
+      background-color: #1C1C23;   /* lighter fill segments the footer + lifts the form fields */
       padding: clamp(60px, 9vw, 140px) 0 0;
     }
 
@@ -1444,7 +1619,7 @@
     }
     @media (min-width: 1024px) {
       .footer-grid {
-        grid-template-columns: 1fr 1px 1.1fr;   /* middle 1px column is the divider */
+        grid-template-columns: 1fr 1px 1fr;   /* equal columns → divider dead-centre */
         gap: clamp(36px, 4.5vw, 76px);
       }
     }
@@ -1486,7 +1661,7 @@
       font-size: clamp(14px, 1.05vw, 16px);      /* uniform page body copy */
       line-height: 1.55;
       color: rgba(255, 255, 255, 0.85);
-      max-width: 52ch;
+      max-width: 34ch;
       margin: 0;
     }
 
@@ -1796,7 +1971,7 @@
           <!-- Desktop Nav — absolutely centred on the viewport so 'Intelligence' aligns with the M-mark below -->
           <ul class="hidden md:flex items-center gap-8 lg:gap-12 nav-list absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <li><a href="#vision" class="nav-link">Vision</a></li>
-            <li><a href="#intelligence" class="nav-link">Intelligence</a></li>
+            <li><a href="#install" class="nav-link">Intelligence</a></li>
             <li><a href="#join" class="nav-link">Join Us</a></li>
           </ul>
 
@@ -1813,7 +1988,7 @@
         <div id="mobileNav" class="md:hidden">
           <ul>
             <li><a href="#vision" class="nav-link">Vision</a></li>
-            <li><a href="#intelligence" class="nav-link">Intelligence</a></li>
+            <li><a href="#install" class="nav-link">Intelligence</a></li>
             <li><a href="#join" class="nav-link">Join Us</a></li>
             <li><a href="#contact" class="nav-link">Get in touch</a></li>
           </ul>
@@ -1887,12 +2062,15 @@
     <div class="ci-visual" aria-hidden="true">
       <img class="turbine-still" src="images/turbine.png" alt="" />
       <canvas id="turbineCanvas" class="turbine-canvas turbine-emit"></canvas>
+      <img class="ci-mark" src="images/mm_192.svg" alt="" />
     </div>
     <div class="ci-inner max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
       <div class="ci-text">
         <h2 class="ci-heading ci-rise">Our intelligence turns disconnected data into <span class="ci-em">Connected Understanding.</span></h2>
         <div class="body-copy ci-rise" style="--rise-delay: 280ms;">
-          <p>A foundational infrastructure layer for machine-readable industrial reality. Systems that perceive cause and effect, learn from it, and continuously evolve to shape better realities.</p>
+          <p>The physical economy does not run on language. It runs on reality. MatterMind is building the intelligence layer for that reality.</p>
+          <p>Today&rsquo;s AI can reason through language, but the physical economy runs on systems, constraints, and real-world cause and effect. Its data, context, and operational knowledge remain fragmented across machines, models, processes, and people.</p>
+          <p style="font-weight: 400;">MatterMind creates a foundational layer for machine-readable industrial reality. Systems that learn from operations, understand cause and effect, and continuously evolve to shape better realities.</p>
         </div>
       </div>
     </div>
@@ -1912,7 +2090,7 @@
         <h2 class="install-heading">MatterMind installs the <em class="install-em">intelligence layer</em><br class="install-br"> physical systems have never had.</h2>
 
         <div id="trayLayer" class="ontology-layer" aria-hidden="true"><img src="images/tray.png" alt="" loading="lazy" decoding="async" /></div>
-        <div id="refineryLayer" class="ontology-layer" aria-hidden="true"><img src="images/refinery.png" alt="" loading="lazy" decoding="async" /></div>
+        <div id="refineryLayer" class="ontology-layer" aria-hidden="true"><img src="images/refinery.png" alt="" loading="lazy" decoding="async" /><span class="tower-beacon beacon-a"></span><span class="tower-beacon beacon-b"></span></div>
         <canvas id="ontologyCanvas" aria-hidden="true"></canvas>
         <div id="groundGrad" class="ground-gradient" aria-hidden="true"></div>
         <div id="groundLine" class="ground-line" aria-hidden="true"></div>
@@ -1973,14 +2151,15 @@
        ========================================= -->
   <section class="section-g">
     <div class="phil-bloom" aria-hidden="true" data-parallax="0.12">
+      <img class="phil-bloom-orb" src="images/bloom.webp" alt="" aria-hidden="true" />
       <canvas class="phil-particles" aria-hidden="true"></canvas>
     </div>
     <div class="phil-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
       <p class="philosophy">
-        <em class="key">Correctness</em> before growth.<br>
-        <em class="key">Simulation</em> before action.<br>
-        <em class="key">Trust</em> before autonomy.
+        Operational knowledge becomes measurable efficiency.<br>
+        Ownership stays with you.
       </p>
+      <p class="phil-sub">Correctness before growth. Simulation before action. Trust before autonomy.</p>
       <div class="partner-wrap">
         <a class="cta-partner" href="#contact">Become a partner</a>
       </div>
@@ -2106,69 +2285,26 @@
       });
     })();
 
-    // Section G — philosophy: wrap each word in a .phil-word span and stagger
-    // a fade-up animation when the user scrolls and the deep-tech band
-    // (caption + image) is visible on screen.
+    // Section 6 — philosophy mono sub-line: build the letters up front (hidden)
+    // and expose a reveal fn. The bloom coordinator calls it at the bloom peak
+    // so the letter-by-letter glitch fires together with the particles.
     (function () {
-      const philosophy = document.querySelector('.philosophy');
-      if (!philosophy) return;
-
-      // Walk the existing children and wrap each word (and each <em class="key">
-      // element) in its own .phil-word span. Whitespace between words is preserved.
-      const original = Array.from(philosophy.childNodes);
-      philosophy.textContent = '';
-      original.forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const tokens = node.textContent.split(/(\s+)/);
-          tokens.forEach(tok => {
-            if (!tok.length) return;
-            if (/^\s+$/.test(tok)) {
-              philosophy.appendChild(document.createTextNode(tok));
-            } else {
-              const span = document.createElement('span');
-              span.className = 'phil-word';
-              span.textContent = tok;
-              philosophy.appendChild(span);
-            }
-          });
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-          if (node.tagName === 'BR') {
-            // Keep line breaks as real breaks (don't wrap them in a span).
-            philosophy.appendChild(node);
-          } else {
-            // Wrap the element (e.g. <em class="key">) in a .phil-word span.
-            const span = document.createElement('span');
-            span.className = 'phil-word';
-            span.appendChild(node);
-            philosophy.appendChild(span);
-          }
-        }
+      const el = document.querySelector('.phil-sub');
+      if (!el) return;
+      const text = el.textContent;
+      const STAGGER = 24;
+      el.textContent = '';
+      Array.from(text).forEach((ch, i) => {
+        const s = document.createElement('span');
+        s.className = 'flow-letter';
+        s.textContent = ch;
+        s.style.animationDelay = (i * STAGGER) + 'ms';
+        s.style.animationPlayState = 'paused';   // hold hidden until revealed
+        el.appendChild(s);
       });
-
-      // Stagger animation delays — 130ms per word.
-      const words = philosophy.querySelectorAll('.phil-word');
-      words.forEach((w, i) => {
-        w.style.setProperty('--word-delay', (i * 130) + 'ms');
-      });
-
-      if (!('IntersectionObserver' in window)) {
-        philosophy.classList.add('in-view');
-        return;
-      }
-
-      // Trigger the reveal when the philosophy itself is just starting to
-      // enter the viewport — that way the user actually witnesses the
-      // word-by-word fade as they scroll the line into view, rather than
-      // it firing before they get there.
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            philosophy.classList.add('in-view');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.25 });
-      observer.observe(philosophy);
+      window.__revealPhilSub = function () {
+        el.querySelectorAll('.flow-letter').forEach(l => { l.style.animationPlayState = 'running'; });
+      };
     })();
 
     // Section H — staggered fade-up reveal of the form fields when the
@@ -2518,7 +2654,7 @@
       const BOOT_FLOW = ['Industrial world ›', 'Sensed ›', 'Understood ›', 'Decided ›', 'Optimised ›', 'Transformed ›'];
       // Index 0 is the "Efficiencies unlocked" intro; 1..9 are the nine benefits
       // that loop. Stored sentence-case; CSS uppercases them.
-      const BOOT_BENE = ['›Efficiencies unlocked', '›Energy intelligence', '›Yield maximisation', '›Fast failure', '›Anomaly mitigation', '›Throughput acceleration', '›Bottleneck elimination', '›Safety & carbon gains', '›Capex avoidance', '›Self optimising industrial operations'];
+      const BOOT_BENE = ['Efficiencies unlocked', 'Energy intelligence', 'Yield maximisation', 'Fast failure', 'Anomaly mitigation', 'Throughput acceleration', 'Bottleneck elimination', 'Safety & carbon gains', 'Capex avoidance', 'Self optimising industrial operations'];
       const FLOW_FIRST = 1200;    // "Industrial world ›" holds a touch longer
       const FLOW_STEP  = 700;     // each subsequent flow word
       const LETTER_STAGGER = 28;  // per-letter reveal stagger
@@ -2698,7 +2834,7 @@
 
       started = true;
       onScrollUpdate();
-      if (reduced) { growth = 1; logoReveal = 1; canvas.style.opacity = '1'; refineryLayer.style.opacity = '1'; trayLayer.style.clipPath = 'inset(0 0 0 0)'; groundLine.style.transform = 'scaleX(1)'; groundGrad.style.opacity = '1'; obsLabel.style.opacity = '1'; actLabel.style.opacity = '1'; obsLabel.style.transform = 'none'; actLabel.style.transform = 'none'; if (installHeading) { installHeading.style.opacity = '1'; installHeading.style.transform = 'translateX(-50%)'; } if (outro) outro.style.opacity = '1'; if (flowSlot) flowSlot.innerHTML = '<span class="boot-word">Transformed ›</span>'; if (beneSlot) beneSlot.innerHTML = '<span class="boot-word">›Efficiencies unlocked</span>'; draw(0, 0); }
+      if (reduced) { growth = 1; logoReveal = 1; canvas.style.opacity = '1'; refineryLayer.style.opacity = '1'; trayLayer.style.clipPath = 'inset(0 0 0 0)'; groundLine.style.transform = 'scaleX(1)'; groundGrad.style.opacity = '1'; obsLabel.style.opacity = '1'; actLabel.style.opacity = '1'; obsLabel.style.transform = 'none'; actLabel.style.transform = 'none'; if (installHeading) { installHeading.style.opacity = '1'; installHeading.style.transform = 'translateX(-50%)'; } if (outro) outro.style.opacity = '1'; if (flowSlot) flowSlot.innerHTML = '<span class="boot-word">Transformed ›</span>'; if (beneSlot) beneSlot.innerHTML = '<span class="boot-word">Efficiencies unlocked</span>'; draw(0, 0); }
       else maybeRun();
     })();
 
@@ -2766,8 +2902,9 @@
 
       video.addEventListener('ended', () => {
         video.removeAttribute('controls');
-        video.currentTime = 0;
         frame.classList.remove('is-playing');
+        // Reset the element so the poster image shows again (not a black/last frame).
+        video.load();
       });
     })();
 
@@ -2781,6 +2918,7 @@
       const ctx = canvas.getContext('2d');            // emission lines + text (in front of the curve)
       const section = canvas.closest('.section-ci');
       const turbineStill = section ? section.querySelector('.turbine-still') : null;  // turbine image (behind the curve)
+      const ciMark = section ? section.querySelector('.ci-mark') : null;              // white MM mark (centre "heart")
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       const DATA = [
@@ -2903,6 +3041,8 @@
           const introEased = introE * introE * (3 - 2 * introE);
           turbineStill.style.transform = 'rotate(' + turbineRotation + 'rad) scale(' + (0.55 + 0.45 * introEased) + ')';
           turbineStill.style.opacity = introEased.toFixed(3);
+          // centre mark fades in with the turbine (transform is owned by its heartbeat animation)
+          if (ciMark) ciMark.style.opacity = introEased.toFixed(3);
         }
         // emission (lines + text) fades in only after the turbine has approached
         if (playElapsed > INTRO_DELAY) emitOpacity = Math.min(1, emitOpacity + dt / 1.6);
@@ -2981,6 +3121,7 @@
       started = true;
       if (reduced) {
         if (turbineStill) { turbineStill.style.opacity = '1'; turbineStill.style.transform = 'none'; }
+        if (ciMark) ciMark.style.opacity = '1';
         draw(0);
       } else maybeRun();
     })();
@@ -3052,24 +3193,32 @@
       io.observe(wrap);
     })();
 
-    // Section G — bloom particle burst. Warm sparks radiate straight out from
-    // the starburst centre and fade quickly, in colours sampled from the bloom
-    // itself, so it reads as "alive with intelligence". Lightweight: 30fps cap,
-    // DPR cap, additive blending inside the canvas (no CSS blend mode), and a
-    // hard pause via IntersectionObserver / visibility. Skipped for reduced-motion.
+    // Section 6 — bloom reveal coordinator. On scroll-in: the base scene
+    // (trust_bloom.webp, the .phil-bloom bg) is already showing; then the bloom
+    // orb (bloom.webp) scales 20%→100% and fades in with an ease-out. The moment
+    // the orb reaches 80% scale, the particle burst is released and the text
+    // reveals — all together. Skipped/static under prefers-reduced-motion.
     (function () {
       const canvas = document.querySelector('.phil-particles');
-      if (!canvas) return;
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const orb = document.querySelector('.phil-bloom-orb');
+      const bloom = document.querySelector('.phil-bloom');
+      const philContent = document.querySelector('.phil-content');
+      if (!canvas || !bloom) return;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function revealText() {
+        if (philContent) philContent.classList.add('phil-in');
+        if (typeof window.__revealPhilSub === 'function') window.__revealPhilSub();
+      }
+      if (reduced) { revealText(); return; }   // CSS shows the orb + content statically
+
       const ctx = canvas.getContext('2d');
       const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
       const FRAME_MS = 1000 / 30;
       const MAX = 220;
-      // White sparks (with a faint cool-white variant for a little life).
       const COLORS = [ [255, 255, 255], [244, 248, 255] ];
       let W = 0, H = 0, cx = 0, cy = 0;
       const parts = [];
-      const bloom = canvas.parentElement;             // .phil-bloom — the parallax host
 
       function resize() {
         const r = canvas.getBoundingClientRect();
@@ -3079,23 +3228,21 @@
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         cx = W * 0.5; cy = H * 0.48;                 // bloom centre within the band
       }
-
       function spawn() {
-        const ang = Math.random() * Math.PI * 2;     // radiate in every direction
-        // Slow, tight speed range → smooth, non-erratic drift (halved again).
-        const spd = 21 + Math.random() * 24;         // px/s, straight outward
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 21 + Math.random() * 24;
         const col = COLORS[(Math.random() * COLORS.length) | 0];
         parts.push({
           x: cx + Math.cos(ang) * 3, y: cy + Math.sin(ang) * 3,
           vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
-          life: 1, decay: 0.25 + Math.random() * 0.11,   // longer life (~2.8–4.0s) → +60% further travel, slow fade
-          size: 0.3 + Math.random() * 0.6, col            // much smaller sparks
+          life: 1, decay: 0.25 + Math.random() * 0.11,
+          size: 0.3 + Math.random() * 0.6, col
         });
       }
 
-      let running = false, onScreen = false, hidden = false, last = 0, lastFrame = 0;
+      let running = false, onScreen = false, hidden = false, released = false, last = 0, lastFrame = 0;
       function maybe() {
-        if (onScreen && !hidden) {
+        if (onScreen && !hidden && released) {
           if (!running) { running = true; last = performance.now(); lastFrame = 0; requestAnimationFrame(tick); }
         } else { running = false; }
       }
@@ -3108,8 +3255,6 @@
 
         for (let i = 0; i < 2 && parts.length < MAX; i++) spawn();
 
-        // Track the bloom's vertical parallax drift so the burst stays on the
-        // same plane as the bloom graphic (translate the whole field by it).
         const py = parseFloat(bloom.style.getPropertyValue('--parallax-y')) || 0;
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         ctx.clearRect(0, 0, W, H);
@@ -3120,7 +3265,7 @@
           p.x += p.vx * dt; p.y += p.vy * dt;
           p.life -= p.decay * dt;
           if (p.life <= 0) { parts.splice(i, 1); continue; }
-          const a = p.life * (2 - p.life);            // smooth ease-out fade
+          const a = p.life * (2 - p.life);
           const rgb = p.col[0] + ',' + p.col[1] + ',' + p.col[2] + ',';
           ctx.fillStyle = 'rgba(' + rgb + (a * 0.26).toFixed(3) + ')';
           ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2.6, 0, Math.PI * 2); ctx.fill();
@@ -3130,14 +3275,42 @@
         ctx.globalCompositeOperation = 'source-over';
       }
 
+      // Orb bloom: scale 0.2→1.0 + opacity 0→1 (ease-out). Release particles +
+      // reveal text as soon as the orb reaches 80% scale.
+      let seqStarted = false;
+      function startSequence() {
+        if (seqStarted) return;
+        seqStarted = true;
+        if (!orb) { released = true; revealText(); maybe(); return; }
+        const D = 2400, t0 = performance.now();       // slower, smoother bloom
+        let fired = false;
+        const ease = (x) => 1 - Math.pow(1 - x, 3);   // ease-out cubic
+        (function orbFrame(now) {
+          const p = Math.min(1, (now - t0) / D);
+          const e = ease(p);
+          const s = 0.2 + 0.8 * e;
+          const rot = -10 * (1 - e);                  // -10° → 0°: subtle clockwise turn as it grows
+          orb.style.transform = 'translate(-50%, -50%) rotate(' + rot.toFixed(2) + 'deg) scale(' + s.toFixed(3) + ')';
+          orb.style.opacity = e.toFixed(3);
+          if (!fired && s >= 0.8) { fired = true; released = true; revealText(); maybe(); }
+          if (p < 1) requestAnimationFrame(orbFrame);
+        })(t0);
+      }
+
       resize();
       window.addEventListener('resize', resize);
       if ('IntersectionObserver' in window) {
-        const io = new IntersectionObserver((es) => {
+        new IntersectionObserver((es) => {
           es.forEach(e => { onScreen = e.isIntersecting; maybe(); });
-        }, { threshold: 0.05 });
-        io.observe(canvas);
-      } else { onScreen = true; maybe(); }
+        }, { threshold: 0.05 }).observe(canvas);
+        // Delayed trigger — the bottom inset shrinks the root to the top 40% of
+        // the viewport, so the sequence only fires once the bloom has scrolled
+        // right up near the top (well into the section).
+        const io2 = new IntersectionObserver((es) => {
+          es.forEach(e => { if (e.isIntersecting) { startSequence(); io2.disconnect(); } });
+        }, { threshold: 0, rootMargin: '0px 0px -60% 0px' });
+        io2.observe(bloom);
+      } else { onScreen = true; startSequence(); }
       document.addEventListener('visibilitychange', () => { hidden = document.hidden; maybe(); });
     })();
 
@@ -3618,6 +3791,44 @@ window.RIB_PATHS=[[[0.3655,0.0033],[0.3637,0.0226],[0.3617,0.0419],[0.3594,0.061
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+  </script>
+
+  <!-- Curve pin: lock the shared curved line to the turbine so it lands in the
+       same place in every browser and at every window size. The curve used to
+       sit at a fixed pixel offset from the top of .curve-band, but the sections
+       it aligns with scale with the viewport (100vh hero, 92vh turbine) — so
+       different window heights (e.g. Safari vs Chrome) drifted them apart. The
+       turbine loop sits at a constant fraction of the curve's own height, so we
+       hold the loop on the turbine's centre: top = turbineCentre − FRAC·height. -->
+  <script>
+  (function () {
+    const mq      = window.matchMedia('(min-width: 1024px)');
+    const band    = document.querySelector('.curve-band');
+    const curve   = document.querySelector('.page-curve');
+    const turbine = document.querySelector('#vision .ci-visual');
+    if (!band || !curve || !turbine) return;
+
+    // Tuned in-browser and baked here so every browser/window size places the
+    // curve identically. Re-tune with the slider panel (git history) if needed.
+    const LOOP_FRAC = 0.365;
+
+    function place() {
+      if (!mq.matches) { curve.style.top = ''; return; }   // curve is hidden < 1024px
+      const b = band.getBoundingClientRect();
+      const c = curve.getBoundingClientRect();
+      const t = turbine.getBoundingClientRect();
+      if (!c.height || !t.height) return;                  // not laid out yet
+      const turbineC = (t.top - b.top) + t.height / 2;     // turbine centre, relative to the band
+      curve.style.top = (turbineC - LOOP_FRAC * c.height) + 'px';
+    }
+
+    const kick = () => requestAnimationFrame(place);
+    kick();
+    window.addEventListener('resize', kick, { passive: true });
+    window.addEventListener('load', kick);
+    if (!curve.complete) curve.addEventListener('load', kick, { once: true });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(kick);
+  })();
   </script>
 
 </body>
