@@ -1009,19 +1009,8 @@
     }
 
     /* ===========================
-       H2 + body copy (used inside the bc-stage)
+       Body copy (used inside the bc-stage)
        =========================== */
-    .h2-display {
-      font-family: 'Noto Serif Display', serif;
-      font-weight: 300;                              /* Light */
-      font-size: 60px;
-      line-height: 1.04;
-      letter-spacing: -0.005em;
-      color: #FFFFFF;
-      margin-bottom: clamp(24px, 3vw, 40px);
-    }
-    .h2-display .h2-line { display: block; }
-
     .body-copy { max-width: 56ch; }
     .body-copy p {
       font-family: 'Sora', sans-serif;
@@ -1045,7 +1034,6 @@
        on desktop only — the colour difference (60% vs 88% white) keeps
        it visually distinct without a size differential. */
     @media (min-width: 1024px) {
-      .h2-display { font-size: 76px; }
       .body-copy p.body-fine { font-size: clamp(16px, 1.45vw, 20px); }
     }
 
@@ -1553,13 +1541,6 @@
       margin: clamp(18px, 2.2vw, 30px) auto 0;
     }
 
-    /* Highlighted "key" words — italic, white (per the design). */
-    .philosophy .key {
-      font-style: italic;
-      font-weight: 300;
-      color: #FFFFFF;
-    }
-
     /* "Become a partner" CTA under the philosophy line. */
     .partner-wrap {
       text-align: center;
@@ -1858,30 +1839,6 @@
       }
     }
 
-    /* Word-by-word reveal for the philosophy statement. JS wraps each word
-       in a .phil-word span and sets --word-delay; the .in-view class is
-       added by an IntersectionObserver when the section enters the viewport. */
-    .philosophy .phil-word {
-      display: inline-block;
-      opacity: 0;
-      transform: translateY(8px);
-      white-space: pre;
-    }
-    .philosophy.in-view .phil-word {
-      animation: phil-word-fade 700ms cubic-bezier(.2,.6,.2,1) forwards;
-      animation-delay: var(--word-delay, 0ms);
-    }
-    @keyframes phil-word-fade {
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .philosophy .phil-word {
-        opacity: 1 !important;
-        transform: none !important;
-        animation: none !important;
-      }
-    }
 
     /* Desktop: philosophy is pulled up significantly so it visibly overlaps
        the bottom edge of the wide bloom — the user sees both image and
