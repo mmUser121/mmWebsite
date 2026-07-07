@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="MatterMind is a deep-tech R&D lab embedding intelligence into the foundations of reality — bringing perception, reasoning, and autonomy into the systems that shape the physical world." />
-  <meta name="theme-color" content="#232634" />
+  <meta name="theme-color" content="#06060E" />
   <meta name="color-scheme" content="dark" />
   <title>MatterMind | AI for the Physical World and Industrial Intelligence.</title>
 
@@ -44,15 +44,15 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Preload the hero background image so it lands with the first paint
+  <!-- Preload the hero video poster so it lands with the first paint
        rather than after CSS parses. Other large bg images are below the
        fold and load naturally as the user scrolls. -->
-  <link rel="preload" as="image" href="images/hero_bg_2400.webp" fetchpriority="high">
+  <link rel="preload" as="image" href="videos/hero-bg.webp" fetchpriority="high">
 
   <!-- Google Fonts: Noto Serif Display, Sora, Share Tech Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Display:ital,wght@0,300;0,400;1,300&family=Share+Tech+Mono&family=Sora:wght@100;200;300;400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Serif+Display:ital,wght@0,300;0,400;1,300&family=Share+Tech+Mono&family=Sora:wght@100;200;300;400&display=swap" rel="stylesheet">
 
   <!-- Tailwind theme extension -->
   <script>
@@ -61,7 +61,7 @@
         extend: {
           colors: {
             mm: {
-              bg:     '#232634',
+              bg:     '#06060E',
               text:   '#FFFFFF',
               accent: '#E57366',
               blue:   '#446D9F',
@@ -81,9 +81,9 @@
     /* ===========================
        Base
        =========================== */
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; scrollbar-gutter: stable; }
     body {
-      background-color: #232634;
+      background-color: #06060E;
       color: #FFFFFF;
       font-family: 'Sora', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
@@ -91,96 +91,129 @@
     }
 
     /* ===========================
-       Hero
+       Hero (V2) — sticky, with scroll-driven recede/fade transition
        =========================== */
-    /* Hero — the bloom image is painted as a background with background-blend-mode
-       (paint-time, cached) instead of mix-blend-mode (composite-time, recomputed each
-       frame). This is the single biggest performance win for the hero. */
+    /* V2 swaps the static bloom bg-image for an autoplay <video>, and pins
+       the whole section as sticky so the hero stays visually in place
+       while the feature reel below scrolls up over it. A single CSS
+       variable (--page-scroll-progress, 0→1, set by JS) drives all the
+       scroll-linked effects: scale-down (recede), opacity (fade out),
+       and a dark overlay (slight darken). Reversible — scrolling back up
+       reverses the progress and everything reappears. */
     .hero {
-      position: relative;
-      /* z-index 2 puts the hero ABOVE the section below it (B+C). The
-         bloom-wrap then sits BEHIND the hero in the overlap region, so
-         the hero's natural bottom-fade dissolves into navy without a hard
-         seam against the bloom's top edge. */
-      z-index: 2;
-      min-height: 100vh;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      /* No z-index: hero is sticky-pinned for the entire page scroll. With
+         an explicit z-index it would create a stacking context that floats
+         in front of subsequent sections without their own z-index (section-
+         bc, section-h), so those sections could no longer paint
+         over the faded hero. Without it, those sections paint in tree order
+         over the hero, hiding it cleanly once scrolled past. Layers within
+         the hero still stack correctly via their own z-indices, and
+         .feature-reel (z:2) and .section-g (z:2) still paint above the hero
+         during their overlap windows. */
       overflow: hidden;
-      background-color: #232634;
-      background-image: url('images/hero_bg_2400.webp');
-      background-size: cover;
-      /* --parallax-y is set by the generic parallax controller in JS (desktop
-         only). When unset, falls back to 0 → identical to "center center". */
-      background-position: center calc(50% + var(--parallax-y, 0px));
-      background-repeat: no-repeat;
-      background-blend-mode: screen;
+      background-color: #06060E;
+      /* Derived scroll-linked variables. CSS does the maths; JS only sets
+         --page-scroll-progress on :root. */
+      --hero-progress: var(--page-scroll-progress, 0);
+      --hero-scale: calc(1 - 0.08 * var(--hero-progress));               /* 1.00 → 0.92 */
+      --hero-content-opacity: calc(1 - var(--hero-progress));            /* 1.00 → 0.00 */
+      --hero-darken-alpha: calc(0.55 * var(--hero-progress));            /* 0.00 → 0.55 */
     }
 
-    /* Mobile: scale the bloom image larger than the viewport (135% of
-       container height) and anchor it to the bottom — this lets the bright
-       horizontal particle line sit at exactly 32% of the viewport, matching
-       the M-mark's vertical centre. Parallax is OFF on mobile so --parallax-y
-       stays at its default 0 and `100% + 0px` ≡ `bottom`. */
+    /* Hero video fade-wrapper — handles the LOAD-time fade-in (opacity 0→1
+       over 1300ms, 200ms delay) so it doesn't conflict with the scroll-linked
+       opacity applied directly to .hero-bg below. Composite visible opacity =
+       wrapper × video, so both layers cleanly compose. */
+    .hero-bg-fade {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+      animation: hero-bg-fadein 1300ms cubic-bezier(.16, .84, .32, 1) 200ms forwards;
+    }
+    @keyframes hero-bg-fadein {
+      to { opacity: 1; }
+    }
+
+    /* Hero background video — fills the wrapper, scales + fades via the
+       scroll-linked CSS variables. translateZ(0) + will-change keeps the
+       video on its own GPU compositor layer so frame updates don't trigger
+       re-paint of overlays above it. */
+    .hero-bg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center center;
+      transform: translateZ(0) scale(var(--hero-scale));
+      transform-origin: center center;
+      opacity: var(--hero-content-opacity);
+      will-change: transform, opacity;
+    }
+
+    /* Mobile: the M-mark sits at top: 32% (raised to leave room for the
+       wrapped headline). Shift the video up by 18% of the hero height so
+       the swirl centre emits from exactly the M-mark centre. The resulting
+       gap below blends into bg via .hero-fade (both fade to #06060E). */
     @media (max-width: 767px) {
-      .hero {
-        /* Bloom scaled down to 108% (was 135%). Position offsets the image
-           top by -22vh so its centre still lands at 32vh = 32% of the hero,
-           keeping it aligned with the M-mark (top: 32%) and the particle
-           emission strip (emitYRatio = 0.32). */
-        background-size: auto 108%;
-        background-position: center calc(-22vh + var(--parallax-y, 0px));
+      .hero-bg {
+        transform: translateY(-18%) translateZ(0) scale(var(--hero-scale));
       }
     }
 
-    /* Top header gradient — 100% #446D9F at top -> 0% at bottom */
+    /* Darken overlay — sits above the video, below the gradient/content
+       layers. Fades in 0 → 0.55 black as the user scrolls into the feature
+       reel (gives the "slightly darken" step before the hero is covered). */
+    .hero-darken {
+      position: absolute;
+      inset: 0;
+      background: #000000;
+      opacity: var(--hero-darken-alpha);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* Top header gradient — 100% #000000 at top -> 0% at bottom (V2 per design-system.md) */
     .hero-gradient {
       position: absolute;
       inset: 0 0 auto 0;
       height: 30%;
       background: linear-gradient(
         to bottom,
-        rgba(68, 109, 159, 1) 0%,
-        rgba(68, 109, 159, 0) 100%
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 0) 100%
       );
       z-index: 1;
       pointer-events: none;
     }
 
-    /* Particle canvas — particles emit from the bloom centre and drift outward.
-       Additive blending is handled inside the canvas (globalCompositeOperation),
-       so we don't pay for a mix-blend-mode layer. translateZ(0) + will-change
-       force the canvas onto its own GPU layer so each canvas frame doesn't
-       force re-paint of the hero's screen-blended background underneath
-       (this was the hidden fps drain). */
-    .hero-particles {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 3;
-      pointer-events: none;
-      opacity: 0;
-      animation: hero-fade-in 900ms ease forwards;
-      transform: translateZ(0);
-      will-change: transform;
-    }
-
-    @keyframes hero-fade-in { to { opacity: 1; } }
-
-    /* Soft vignette so the image fades into page background at the bottom */
+    /* Soft vignette so the video fades into page background at the bottom */
     .hero-fade {
       position: absolute;
       inset: auto 0 0 0;
       height: 30%;
       background: linear-gradient(
         to bottom,
-        rgba(35, 38, 52, 0) 0%,
-        rgba(35, 38, 52, 1) 100%
+        rgba(6, 6, 14, 0) 0%,
+        rgba(6, 6, 14, 1) 100%
       );
       z-index: 3;
       pointer-events: none;
     }
 
-    .hero-content { position: absolute; inset: 0; z-index: 4; }
+    .hero-content {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      transform: scale(var(--hero-scale));
+      transform-origin: center center;
+      opacity: var(--hero-content-opacity);
+      will-change: transform, opacity;
+    }
 
     /* ===========================
        Typography (per design system)
@@ -189,16 +222,25 @@
     .h1-display {
       font-family: 'Noto Serif Display', serif;
       font-weight: 300;                                  /* Light */
-      font-size: clamp(50px, 5.44vw, 78px);
+      font-size: clamp(50px, 4.2vw, 62px);
       line-height: 1.08;
       letter-spacing: -0.005em;
       color: #FFFFFF;
     }
-    .h1-display .italic-line {
+    .h1-display .h1-line-2 {
       display: block;
+    }
+    .h1-display .italic-line {
       font-style: italic;
       font-weight: 300;                                  /* Light Italic */
       letter-spacing: 0;
+    }
+    /* Mobile/tablet: italic phrase becomes its own block so it starts on a
+       new visual line (matches V1's tidy stacked wrap); the .h1-line-2
+       desktop break is demoted to inline so it doesn't add a third block. */
+    @media (max-width: 1023px) {
+      .h1-display .h1-line-2 { display: inline; }
+      .h1-display .italic-line { display: block; }
     }
 
     .intro-text {
@@ -239,23 +281,24 @@
       .nav-list li + li::before { left: -1.5rem; }  /* half of lg:gap-12 (3rem) */
     }
 
-    /* CTA button — title case per design */
+    /* CTA button — matches the "Become a partner" button (mono, uppercase). */
     .btn-cta {
-      font-family: 'Sora', sans-serif;
-      font-weight: 300;
-      font-size: 14px;
-      letter-spacing: 0.02em;
-      padding: 10px 22px;
-      border: 1px solid rgba(255, 255, 255, 0.55);
-      border-radius: 4px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(11px, 1vw, 13px);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      padding: 12px 28px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: transparent;
       color: #FFFFFF;
-      transition: all 0.25s ease;
+      text-decoration: none;
       white-space: nowrap;
+      transition: background-color 300ms ease, border-color 300ms ease, color 300ms ease;
     }
     .btn-cta:hover {
-      border-color: #E57366;
-      color: #E57366;
-      box-shadow: 0 0 20px rgba(229, 115, 102, 0.25);
+      background-color: rgba(255, 255, 255, 0.10);
+      border-color: rgba(255, 255, 255, 0.7);
+      color: #FFFFFF;
     }
 
     /* Wordmark */
@@ -338,7 +381,9 @@
     .intro-text {
       opacity: 0;
       transform: translateY(8px);
-      animation: line-reveal 1200ms cubic-bezier(.2,.6,.2,1) 2700ms forwards;
+      /* Appears together with the last two words ("physical economy.",
+         which start at 1480ms / 1610ms). */
+      animation: line-reveal 1200ms cubic-bezier(.2,.6,.2,1) 1500ms forwards;
     }
 
     @keyframes line-reveal {
@@ -348,7 +393,6 @@
 
     /* Respect users who prefer reduced motion */
     @media (prefers-reduced-motion: reduce) {
-      .hero-particles,
       .mark,
       .h1-display .word,
       .intro-text {
@@ -358,6 +402,15 @@
       }
       .mark { transform: translate(-50%, -50%) !important; }
       .hero-text { transform: translateX(-50%) !important; }
+      /* Disable the hero video load fade-in and the scroll-linked
+         recede/fade. Hero stays at full opacity / scale 1; the JS scroll
+         listener early-returns so --page-scroll-progress never updates. */
+      .hero-bg-fade {
+        animation: none !important;
+        opacity: 1;
+      }
+      .hero { --page-scroll-progress: 0 !important; }
+      .feature-reel { --page-scroll-progress: 0 !important; }
     }
 
     /* Mobile menu icon */
@@ -439,6 +492,256 @@
     }
 
     /* ===========================
+       Feature reel (tap-to-play, V2)
+       =========================== */
+    /* Sits between the hero and Section B+C. True tap-to-play —
+       preload="none" means ZERO video bytes are fetched on page load
+       (only the poster image). On first tap, JS adds the `controls`
+       attribute so the user can pause / scrub, and starts playback. */
+    .feature-reel {
+      position: relative;
+      z-index: 2;
+      /* Soft vertical gradient (transparent → solid bg) so the top edge
+         doesn't form a hard line over the receding hero. The transparent
+         portion lets the hero behind read through during the transition;
+         by the time the reel is fully in view, the gradient has reached
+         its solid stop and the hero is fully covered. */
+      /* Transparent top (0–28%) for the hero transition; solid through the
+         middle; then fades back to transparent at the bottom so the shared
+         curved line reveals gradually instead of being hard-cropped where the
+         solid fill used to end. */
+      background: linear-gradient(
+        to bottom,
+        rgba(6, 6, 14, 0)   0%,
+        rgba(6, 6, 14, 1)  28%,
+        rgba(6, 6, 14, 1)  50%,
+        rgba(6, 6, 14, 0) 100%
+      );
+      padding: clamp(40px, 6vw, 100px) 0;
+      /* Scroll-linked scale: as the reel scrolls into view, the frame grows
+         from 0.94 → 1.04 (peaks slightly larger than its at-rest size, per
+         the design ref). Driven by the same --page-scroll-progress that
+         fades out the hero. */
+      --reel-progress: var(--page-scroll-progress, 0);
+      --reel-scale: calc(0.94 + 0.10 * var(--reel-progress));
+    }
+    .feature-reel-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 40px;                /* mobile px-10 */
+    }
+    @media (min-width: 1024px) {
+      .feature-reel-container { padding: 0 56px; }   /* lg:px-14 */
+    }
+    .feature-reel-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 20px;
+      overflow: hidden;
+      background-color: #06060E;
+      transform: scale(var(--reel-scale));
+      transform-origin: center center;
+      will-change: transform;
+    }
+    .feature-reel-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background-color: #06060E;
+    }
+    .feature-reel-play {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: clamp(72px, 7vw, 96px);
+      height: clamp(72px, 7vw, 96px);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      padding: 0;
+      z-index: 2;
+      opacity: 0.3;
+      transition: opacity 0.25s ease, transform 0.2s ease;
+    }
+    .feature-reel-play img {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .feature-reel-play:hover,
+    .feature-reel-play:focus-visible {
+      opacity: 0.5;
+      transform: translate(-50%, -50%) scale(1.04);
+      outline: none;
+    }
+    /* While playing: hide the custom button so native controls own the UI */
+    .feature-reel-frame.is-playing .feature-reel-play {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* The V1 hero/section-bc overlap (negative margin-top on .section-bc)
+       no longer applies when the feature reel is sandwiched between them
+       — neutralise it so section-bc sits cleanly below the reel. The
+       hero-to-reel and reel-to-bloom transitions get tuned in a later step. */
+    .feature-reel + .section-bc {
+      margin-top: 0;
+    }
+
+    /* ===========================
+       Section — "Connected Understanding" (turbine)
+       =========================== */
+    /* Shared curved line spanning sections 2–4 (feature reel, turbine, ontology).
+       No z-index of its own (a stacking context would disturb the hero→reel
+       transition). `overflow-x: clip` clips the curve's horizontal overflow
+       (killing page-wide horizontal scroll) WITHOUT creating a scroll container
+       — so, unlike `overflow: hidden`, it doesn't break the sticky ontology
+       stage. The curve sits at z-0; each section sits above it (z-index ≥ 1)
+       with a transparent background. Position/scale tunable via --curve-* vars. */
+    .curve-band {
+      position: relative;
+      overflow-x: clip;
+    }
+    .page-curve {
+      display: none;
+      position: absolute;
+      /* Vertical offset lives in `top` (not the transform) so the JS pin can
+         override it cleanly; horizontal stays in the transform. JS replaces
+         `top` at runtime to keep the curve locked to the turbine. */
+      top: calc(var(--curve-top, 6vh) + var(--curve-dy, 0px));
+      left: 50%;
+      width: var(--curve-w, 1300px);
+      height: auto;                 /* keep the SVG's natural ratio */
+      aspect-ratio: 1482.863 / 2085.958;  /* pin ratio so height is identical cross-browser */
+      --curve-w: 1140px;            /* desktop position (tuned) */
+      --curve-dx: 220px;
+      --curve-dy: 665px;            /* fallback only; JS pins to the turbine on desktop */
+      transform: translateX(-50%) translateX(var(--curve-dx, 0px));
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.85;
+    }
+    @media (min-width: 1024px) { .page-curve { display: block; } }
+
+    /* Transparent bg so the shared .curve-band curve shows through behind the
+       turbine content. */
+    .section-ci {
+      position: relative;
+      z-index: 1;
+      padding: clamp(64px, 12vw, 140px) 0;
+      overflow: hidden;
+    }
+    .ci-inner { position: relative; z-index: 2; }
+    .ci-heading {
+      font-family: 'Noto Serif Display', serif;
+      font-weight: 300;
+      font-size: clamp(26px, 3.2vw, 40px);
+      line-height: 1.16;
+      letter-spacing: -0.005em;
+      color: #FFFFFF;
+      margin: 0 0 clamp(20px, 2vw, 32px);
+    }
+    .ci-heading .ci-em { font-style: italic; }
+    .ci-text { max-width: 46ch; }
+    .ci-text .body-copy p {
+      font-size: clamp(14px, 1.05vw, 16px);
+      /* Narrower than the heading — wraps after the first sentence
+         ("…does not run on language."). Tunable ±2ch. */
+      max-width: 31ch;
+    }
+    /* Rise-in reveal — held until .is-revealed is added (when the turbine
+       reaches the middle of the viewport), so it doesn't fire on approach. */
+    .ci-rise {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 900ms cubic-bezier(.2,.6,.2,1), transform 900ms cubic-bezier(.2,.6,.2,1);
+      transition-delay: var(--rise-delay, 0ms);
+      will-change: opacity, transform;
+    }
+    .ci-text.rise-in .ci-rise { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .ci-rise { transition: none; opacity: 1; transform: none; }
+    }
+    /* Turbine visual — centred in the page. Mobile: sits below the text in
+       normal flow. Desktop: absolutely centred, ~2x larger, heading overlays left. */
+    .ci-visual {
+      position: relative;
+      width: min(560px, 92%);
+      margin: clamp(32px, 7vw, 64px) auto 0;
+      aspect-ratio: 1 / 1;
+      z-index: 1;
+    }
+    .turbine-canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+    }
+    /* Turbine image — a DOM element behind the curved line, rotated + scaled
+       by JS (transform). The emission canvas sits in front of the curve. */
+    .turbine-still {
+      position: absolute;
+      inset: 0; margin: auto;
+      width: 56%;               /* diameter ≈ prior 0.28×2 of the square visual */
+      height: auto;
+      z-index: 0;               /* behind the curved line */
+      transform-origin: center center;
+      will-change: transform, opacity;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .turbine-emit { z-index: 2; }   /* emission lines + text — in front of the curved line */
+    /* White MatterMind mark — the "heart" dead-centre of the turbine. mm_192.svg
+       ships black (no fill), so invert it to white. It fades in with the turbine
+       (opacity is JS-driven) and beats via a transform-scale-only heartbeat, so
+       no filter/blend is animated (GPU-composited, cheap). */
+    .ci-mark {
+      position: absolute;
+      inset: 0; margin: auto;
+      width: 9%; height: auto;          /* small scale per the design ref — tunable */
+      z-index: 3;                       /* above turbine image + emission */
+      pointer-events: none;
+      opacity: 0;                       /* ramps in with the turbine reveal (JS) */
+      filter: brightness(0) invert(1);  /* black artwork → white (static, not animated) */
+      transform-origin: center center;
+      animation: ci-heartbeat 1.7s ease-in-out infinite;
+    }
+    /* lub-dub then rest — very subtle (max +5%) */
+    @keyframes ci-heartbeat {
+      0%, 44%, 100% { transform: scale(1); }
+      12%           { transform: scale(1.05); }  /* lub */
+      22%           { transform: scale(1); }
+      32%           { transform: scale(1.03); }  /* dub */
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ci-mark { animation: none; }
+    }
+    @media (min-width: 1024px) {
+      .section-ci { min-height: 92vh; display: flex; align-items: center; }
+      /* width:100% so the flex item fills the line — then max-w-[1280px]
+         mx-auto centres a full-width container and the text sits at its LEFT
+         (without this the block shrinks to the text width and mx-auto centres
+         the text in the page, overlapping the turbine). */
+      .ci-inner { width: 100%; }
+      .ci-visual {
+        position: absolute;
+        left: 50%; top: 50%;
+        transform: translate(-50%, -50%);
+        width: clamp(672px, 67vw, 1056px);   /* +20% larger */
+        margin: 0;
+        pointer-events: none;
+      }
+      /* Container wide enough for the heading's 25ch cap → reliably 3 lines.
+         The body copy is capped separately (narrower) via .ci-text .body-copy p. */
+      .ci-text { max-width: 500px; position: relative; transform: translateY(-50px); }
+      /* Character-based cap on the heading → wraps onto ~3 lines and stays 3
+         across desktop sizes (ch scales with the heading's own font). */
+      .ci-heading { max-width: 25ch; }
+    }
+
+    /* ===========================
        Sections B + C — Transition Visual + "We are MatterMind"
        Combined into a single stage so on desktop the caption can overlap
        the bloom on the left and the C content can overlap on the right.
@@ -446,7 +749,7 @@
        =========================== */
     .section-bc {
       position: relative;
-      background-color: #232634;
+      background-color: #06060E;
       padding: 0 0 clamp(10px, 1.25vw, 20px);  /* halved — divider sits closer */
       margin-top: -20px;                       /* mobile: small pull-up under hero */
     }
@@ -463,7 +766,7 @@
       aspect-ratio: 1 / 1;
       margin-left: calc(50% - 50vw);
       margin-right: calc(50% - 50vw);
-      background-color: #232634;
+      background-color: #06060E;
       background-image: url('images/quantum_bloom_img.webp');
       background-size: 135%;                /* zoom in so the bloom fills the frame */
       background-position: center center;
@@ -706,26 +1009,15 @@
     }
 
     /* ===========================
-       H2 + body copy (used inside the bc-stage)
+       Body copy (used inside the bc-stage)
        =========================== */
-    .h2-display {
-      font-family: 'Noto Serif Display', serif;
-      font-weight: 300;                              /* Light */
-      font-size: 60px;
-      line-height: 1.04;
-      letter-spacing: -0.005em;
-      color: #FFFFFF;
-      margin-bottom: clamp(24px, 3vw, 40px);
-    }
-    .h2-display .h2-line { display: block; }
-
     .body-copy { max-width: 56ch; }
     .body-copy p {
       font-family: 'Sora', sans-serif;
       font-weight: 200;
-      font-size: clamp(16px, 1.45vw, 20px);
+      font-size: clamp(14px, 1.05vw, 16px);      /* uniform page body copy */
       line-height: 1.55;
-      color: rgba(255, 255, 255, 0.88);
+      color: rgba(255, 255, 255, 0.85);
       margin-bottom: clamp(18px, 1.8vw, 26px);
     }
     .body-copy p:last-child { margin-bottom: 0; }
@@ -742,382 +1034,477 @@
        on desktop only — the colour difference (60% vs 88% white) keeps
        it visually distinct without a size differential. */
     @media (min-width: 1024px) {
-      .h2-display { font-size: 76px; }
       .body-copy p.body-fine { font-size: clamp(16px, 1.45vw, 20px); }
     }
 
     /* ===========================
-       Section D — Divider / Horizon Layer
+       Section — "MatterMind installs the intelligence layer"
+       Sticky ontology stage: refinery + tray + node canvas + ground line +
+       OBSERVATION/ACTION labels. Heading sits above; flow chevron + the
+       efficiencies list sit below.
        =========================== */
-    .section-d {
-      background-color: #232634;
-      padding: 0 0 clamp(20px, 3vw, 40px);
+    /* No overflow:hidden here — it would make this a scroll container and
+       break the child .install-stage's position:sticky pinning (the stage
+       would scroll away instead of pinning to the viewport). The stage clips
+       its own wide refinery via its own overflow:hidden. */
+    /* No background fill — the shared curved line (behind the .curve-band that
+       wraps sections 2–4) shows through. */
+    .section-install {
       position: relative;
+      z-index: 1;
     }
 
-    /* Mobile: add ~100px breathing room above and below the divider band.
-       Also cancels Section E's negative margin-top (which overlaps its
-       heading onto the divider on desktop) so mobile reads as clear,
-       separated bands instead. */
-    @media (max-width: 767px) {
-      .section-d {
-        padding-top: 100px;
-        padding-bottom: 100px;
-      }
-      .section-e { margin-top: 0; }
+    /* Heading pinned near the top of the stage, centred. Two lines on desktop
+       (explicit <br>); wraps naturally on mobile. */
+    .install-heading {
+      position: absolute;
+      top: calc(clamp(28px, 8vh, 88px) + 50px);   /* dropped 50px lower */
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(90%, 40ch);
+      z-index: 6;
+      font-family: 'Noto Serif Display', serif;
+      font-weight: 300;
+      font-size: clamp(26px, 3.2vw, 40px);
+      line-height: 1.16;
+      color: #FFFFFF;
+      text-align: center;
+      margin: 0;
+    }
+    .install-em { font-style: italic; }
+    .install-br { display: none; }
+    @media (min-width: 1024px) {
+      .install-heading { width: min(92%, 46ch); }
+      .install-br { display: inline; }
     }
 
-    /* Stage holds the divider image (as a background) plus the M-mark and the
-       absolutely-positioned OBSERVATION / ACTION labels overlaid on the band.
-
-       Mobile/tablet: fixed-height wrap with `background-size: cover` — the
-       image is scaled so its full HEIGHT fills the container, then horizontally
-       cropped at the sides as needed. The visible band keeps a strong visual
-       presence on small screens instead of being scaled down to a thin strip.
-       Desktop: aspect-ratio matches the source 3000×1125 so the image fills
-       the viewport at full natural aspect with no crop. */
-    .divider-stage {
+    /* Scroll-driven stage: sticky pin + 240vh of scroll room to play the
+       refinery → node field → tray reveal cleanly. */
+    .install-scroll {
       position: relative;
-      width: 100%;
-      height: clamp(240px, 32vw, 360px);
-      background-image: url('images/particle_divider.webp');
-      background-size: cover;
-      background-position: center center;
-      background-repeat: no-repeat;
+      /* 180vh → ~80vh of pinned scroll. The reveal finishes by pin ~0.44 and
+         the auto sequence fires at 0.48; the shorter section trims the "dead"
+         pinned scroll after that so it unlocks to Section 5 sooner. */
+      height: 180vh;
+    }
+    .install-stage {
+      position: sticky;
+      top: 0;
+      height: 100vh;
       overflow: hidden;
+      background: transparent;
     }
 
-    @media (min-width: 1280px) {
-      .divider-stage {
-        height: auto;
-        aspect-ratio: 3000 / 1125;
-      }
+    /* Stacked layers, all centred on the same horizontal band.
+       Back → front: ground-grad (1) → tray (2) → refinery (3) → line (4) → nodes/logo (5). */
+    .ontology-layer {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      will-change: opacity;
     }
-
-    /* ===== BEGIN: divider particle effect (CSS) =====================
-       To disable the effect entirely, delete this CSS block, the matching
-       <canvas id="dividerParticles"> in the HTML, and the matching
-       JS IIFE marked "divider particle effect". */
-    .divider-particles {
+    .ontology-layer img { display: block; width: 100%; height: auto; }
+    #trayLayer {
+      width: min(620px, 40vw);
+      z-index: 2;
+      top: 60%;
+      transform: translateX(-50%);
+      opacity: 1;
+      clip-path: inset(0 0 100% 0);
+    }
+    #refineryLayer {
+      width: min(1040px, 66vw);
+      z-index: 3;
+      opacity: 0;
+    }
+    /* Tower-top beacons. Positioned + sized as a % of the refinery layer, so
+       they stay locked to the tower tops at any refinery scale. They live
+       inside #refineryLayer, so they fade in with it. Colour #FFA398 with a
+       layered glow; both share one animation (no delay) so they pulse in sync
+       from full brightness down to ~20%. Opacity-only (perf: no animated filter). */
+    .tower-beacon {
+      position: absolute;
+      width: 0.5%;                 /* ~5px at desktop refinery width; scales with it */
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: #FFA398;
+      transform: translate(-50%, -50%);   /* centre the dot on its coordinate */
+      pointer-events: none;
+      box-shadow:
+        0 0 4px 1px rgba(255, 163, 152, 0.95),
+        0 0 9px 3px rgba(255, 163, 152, 0.6),
+        0 0 16px 6px rgba(255, 163, 152, 0.35);
+      will-change: opacity;
+      animation: beacon-pulse 2.6s ease-in-out infinite;
+    }
+    .beacon-a { left: 30.5%; top: 6%; }    /* left tall chimney  — tunable */
+    .beacon-b { left: 83.65%; top: 12%; }  /* right tall tower   — tunable */
+    @keyframes beacon-pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.2; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .tower-beacon { animation: none; }
+    }
+    #ontologyCanvas {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      z-index: 1;            /* between bg image (0) and M-mark / labels (2) */
-      pointer-events: none;
+      z-index: 5;
+      opacity: 0;
+      will-change: opacity;
     }
-    /* ===== END: divider particle effect (CSS) ======================= */
-
-    /* M-mark dead centre on the divider band, both axes. */
-    .divider-mark {
+    .ground-gradient {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: clamp(32px, 3.2vw, 52px);
-      height: auto;
-      z-index: 2;
+      left: 0; width: 100%;
+      height: clamp(45px, 6.5vh, 80px);
+      background: linear-gradient(to bottom, #2C191D 0%, rgba(44,25,29,0) 100%);
+      opacity: 0;
+      z-index: 1;
       pointer-events: none;
+      will-change: opacity;
+    }
+    .ground-line {
+      position: absolute;
+      left: 0; width: 100%;
+      height: 1px;
+      background: #615256;
+      transform: scaleX(0);
+      transform-origin: left center;
+      z-index: 4;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .ground-label {
+      position: absolute;
+      left: clamp(24px, 4vw, 64px);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.55);
+      opacity: 0;
+      z-index: 4;
+      pointer-events: none;
+      white-space: nowrap;
+      will-change: opacity, transform;
     }
 
-    /* Labels overlaid on the band. Each row is full-width and uses an
-       inner container so the label aligns with the page's content edge. */
-    .divider-label-row {
+    /* Boot readout — two stacked machine-style lines pinned over the tray.
+       Top line: the process/flow words (title case, smaller), a fast loading
+       reveal that ends on "Transformed" and holds. Bottom line: the benefits
+       (uppercase, larger, "›"-prefixed), revolving one by one. No background
+       panel — white text sits directly over the tray artwork (per the design).
+       The scroll observer fades the whole block in; JS drives the words. */
+    .install-outro {
+      position: absolute;
+      left: 50%;
+      bottom: calc(clamp(40px, 12vh, 118px) + 20px);   /* nudged up 20px */
+      transform: translateX(-50%);
+      width: min(92%, 900px);
+      z-index: 6;
+      opacity: 0;
+      will-change: opacity;
+      text-align: center;
+      pointer-events: none;
+    }
+    /* Each line is a slot: children are absolutely stacked so the outgoing and
+       incoming words can revolve/fade past each other. `perspective` gives the
+       benefit line's rotateY a real 3D revolve. */
+    .boot-flow {
+      position: relative;
+      height: clamp(20px, 2.8vh, 28px);
+      margin-bottom: clamp(6px, 1vh, 12px);
+      perspective: 900px;
+    }
+    .boot-benefit {
+      position: relative;
+      height: clamp(28px, 4.4vh, 44px);
+      overflow: hidden;              /* clip the vertical roll at the slot edges */
+    }
+    .boot-word {
       position: absolute;
       left: 0;
       right: 0;
-      z-index: 2;
-      pointer-events: none;
-    }
-    /* OBSERVATION + ACTION labels start clustered on the divider's centre
-       line and smoothly ease apart to their final positions (top + bottom).
-       The .labels-spread class is applied by a dedicated IntersectionObserver
-       (threshold 1.0) that only fires once the divider is FULLY visible —
-       so the user sees the band fade in first, then the labels travel
-       outward. */
-    .divider-label-row-top {
-      top: 50%;                                 /* start: on the divider line */
-      transition: top 2000ms cubic-bezier(.16, .84, .32, 1);
-    }
-    .divider-label-row-bottom {
-      bottom: 50%;                              /* start: on the divider line */
-      transition: bottom 2000ms cubic-bezier(.16, .84, .32, 1);
-    }
-    .divider-stage.labels-spread .divider-label-row-top    { top: 6%; }
-    .divider-stage.labels-spread .divider-label-row-bottom { bottom: 6%; }
-    @media (prefers-reduced-motion: reduce) {
-      .divider-label-row-top    { top: 6%; transition: none; }
-      .divider-label-row-bottom { bottom: 6%; transition: none; }
-    }
-
-    .divider-label {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 0.22em;
-      color: rgba(255, 255, 255, 0.55);
+      top: 50%;
+      transform: translateY(-50%);
       margin: 0;
-    }
-
-    @media (min-width: 1024px) {
-      .divider-label { font-size: 10px; }
-    }
-
-    /* ===========================
-       Section E — Our intelligence
-       =========================== */
-    .section-e {
-      position: relative;                        /* establish stacking context */
-      z-index: 2;                                /* sit above the divider band */
-      background-color: transparent;             /* let the heading overlap the swirls */
-      padding: 0 0 clamp(80px, 10vw, 140px);
-      margin-top: clamp(-160px, -10vw, -60px);   /* heading sits over the particle swirls */
-    }
-
-    .intel-heading {
-      font-family: 'Noto Serif Display', serif;
-      font-weight: 300;
-      font-size: 60px;
-      line-height: 1.04;
-      letter-spacing: -0.005em;
+      font-family: 'Share Tech Mono', monospace;
       color: #FFFFFF;
-      margin: 0 0 clamp(36px, 4.5vw, 64px) 0;
+      white-space: nowrap;
+      transform-origin: center center;
+      backface-visibility: hidden;
+      will-change: transform, opacity;
     }
-    .intel-heading .h2-line { display: block; }
-
-    /* Grid: stacked on mobile, three columns on tablet+. Tight gap so the
-       diagonal slant on the panel illustrations reads as one continuous
-       line across all three cards. */
-    .intel-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: clamp(8px, 0.9vw, 14px);
+    /* Top line — smaller, title case (as authored). padding-left cancels the
+       trailing letter-spacing so the text is optically centred (letter-spacing
+       adds a gap after the last glyph, which otherwise shifts centred text
+       left of the logo/heading). */
+    .boot-flow .boot-word {
+      font-size: clamp(13px, 1.15vw, 17px);
+      letter-spacing: 0.14em;
+      padding-left: 0.14em;
     }
-    /* Mobile: add an extra 10px of breathing room between the three stacked
-       cards on top of the base gap, so each card reads as a distinct unit. */
-    @media (max-width: 767px) {
-      .intel-grid { row-gap: calc(clamp(8px, 0.9vw, 14px) + 10px); }
+    /* Bottom line — larger, uppercased benefit (same centring correction). */
+    .boot-benefit .boot-word {
+      font-size: clamp(19px, 2.1vw, 30px);
+      letter-spacing: 0.10em;
+      padding-left: 0.10em;
+      text-transform: uppercase;
     }
-    @media (min-width: 768px) {
-      .intel-grid { grid-template-columns: repeat(3, 1fr); }
+    /* "Coming online" status LED — a small #FFA398 indicator (matching the tower
+       beacons) prefixes each unlocked benefit and flicks on (with a micro-
+       flicker) as it energises onto the board. Replaces the old "›" prefix.
+       Sizes/glows in em, so it scales with the benefit text. */
+    .boot-benefit .boot-word::before {
+      content: "";
+      display: inline-block;
+      width: 0.25em; height: 0.25em;
+      margin-right: 0.5em;
+      vertical-align: 0.2em;           /* nudge onto the cap midline — tunable */
+      border-radius: 50%;
+      background: #FFA398;
+      box-shadow: 0 0 0.15em 0.03em rgba(255, 163, 152, 0.9),
+                  0 0 0.42em 0.10em rgba(255, 163, 152, 0.45);
+      /* strike on (once) then breathe continuously through the item's dwell;
+         breathe is listed last so it owns opacity once led-on hands off. */
+      animation: led-on 450ms ease-out both,
+                 led-breathe 1.6s ease-in-out 450ms infinite;
     }
-
-    /* Card — translucent white panel with 20px corners. The illustration
-       sits flush at the bottom (no padding around it). */
-    .intel-card {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      background: rgba(255, 255, 255, 0.10);
-      border-radius: 20px;
-      overflow: hidden;
-      min-height: clamp(300px, 30vw, 380px);
-
-      /* Reveal animation — staggered via --reveal-delay set by nth-child */
+    @keyframes led-on {
+      0%   { opacity: 0;    box-shadow: 0 0 0 0 rgba(255, 163, 152, 0); }
+      16%  { opacity: 1; }              /* strike on */
+      28%  { opacity: 0.35; }           /* micro-flicker */
+      42%  { opacity: 1; }
+      100% { opacity: 0.95;
+             box-shadow: 0 0 0.15em 0.03em rgba(255, 163, 152, 0.9),
+                         0 0 0.42em 0.10em rgba(255, 163, 152, 0.45); }
+    }
+    /* Gentle brightness breathe (opacity dims dot + glow together). */
+    @keyframes led-breathe {
+      0%, 100% { opacity: 0.95; }
+      50%      { opacity: 0.5; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .boot-benefit .boot-word::before { animation: none; opacity: 0.95; }
+    }
+    /* Letter-by-letter glitch reveal — used by the ontology flow words and the
+       philosophy sub-line. Per-letter delay set inline in JS. */
+    .flow-letter {
+      display: inline-block;
+      white-space: pre;              /* preserve spaces */
       opacity: 0;
-      transform: translateY(28px) scale(0.97);
-      transition:
-        opacity   900ms cubic-bezier(.2,.7,.2,1) var(--reveal-delay, 0ms),
-        transform 900ms cubic-bezier(.2,.7,.2,1) var(--reveal-delay, 0ms);
-      will-change: opacity, transform;
+      animation: flow-letter-in 360ms cubic-bezier(.2, .6, .2, 1) forwards;
     }
-    /* Slower stagger between cards — each card waits ~400ms longer than the
-       previous before starting its fade-up. */
-    .intel-card:nth-child(1) { --reveal-delay: 200ms; }
-    .intel-card:nth-child(2) { --reveal-delay: 600ms; }
-    .intel-card:nth-child(3) { --reveal-delay: 1000ms; }
-
-    .intel-card.in-view {
-      opacity: 1;
-      transform: translateY(0) scale(1);
+    @keyframes flow-letter-in {
+      0%   { opacity: 0;    transform: translate3d(-2px, 0, 0); }
+      35%  { opacity: 0.55; transform: translate3d( 1px, 0, 0); text-shadow: 0 0 8px rgba(255,255,255,0.35); }
+      60%  { opacity: 0.3;  transform: translate3d(-1px, 0, 0); }
+      100% { opacity: 1;    transform: none; text-shadow: none; }
     }
-
-    /* Inner wrapper holds the text content with its own padding, so the
-       illustration below can sit flush with the card edges. */
-    .intel-card-content {
-      padding: clamp(22px, 2.4vw, 32px);
+    /* Ontology flow words — "charge-up bloom": each letter snaps in with a brief
+       white glow that cools, plus a tiny scale settle. Scoped to .boot-flow so
+       the shared philosophy sub-line keeps the flow-letter-in glitch above.
+       REVERT: delete this rule + the @keyframes below and the flow words fall
+       back to flow-letter-in. */
+    .boot-flow .flow-letter {
+      animation: flow-letter-charge 440ms cubic-bezier(.2, .7, .2, 1) forwards;
     }
-
-    .intel-card-tag {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 20px;
-      letter-spacing: 0.18em;
-      color: #FFFFFF;
-      margin: 0 0 18px 0;
+    @keyframes flow-letter-charge {
+      0%   { opacity: 0; transform: scale(1.22); text-shadow: 0 0 0 rgba(255,255,255,0); }
+      32%  { opacity: 1; transform: scale(1.05); text-shadow: 0 0 12px rgba(255,255,255,0.95), 0 0 24px rgba(255,255,255,0.5); }
+      100% { opacity: 1; transform: scale(1);    text-shadow: none; }
     }
-
-    .intel-card-text {
-      font-family: 'Sora', sans-serif;
-      font-weight: 200;
-      font-size: 14px;
-      line-height: 1.55;
-      color: rgba(255, 255, 255, 0.75);
-      margin: 0;
-      max-width: 32ch;
-    }
-
-    /* Panel illustration — flush with card edges (no padding/gap), filled
-       with the design's solid #101224. */
-    .intel-card-icon {
-      display: block;
-      width: 100%;
-      height: auto;
-      margin-top: auto;
-    }
-
-    @media (min-width: 1024px) {
-      .intel-card-text { font-size: 15px; }
-    }
-
     @media (prefers-reduced-motion: reduce) {
-      .intel-card {
-        opacity: 1 !important;
-        transform: none !important;
-        transition: none !important;
-      }
+      .flow-letter { opacity: 1 !important; animation: none !important; }
     }
-
     /* ===========================
-       Section F — Deep-tech band
+       Section — "We are teaching infrastructure to think"
+       Text sits in the right half (left-aligned), a full-bleed auto-scrolling
+       strip of industry image tiles sits underneath.
        =========================== */
-    .section-f {
-      background-color: #232634;
-      /* Mobile: tight top padding so the whole F+G unit fits a single viewport. */
-      padding: clamp(16px, 4vw, 32px) 0 0;
+    .section-think {
+      background-color: #06060E;
+      padding: clamp(72px, 11vw, 150px) 0 clamp(120px, 16vw, 240px);   /* extra space before Philosophy */
       position: relative;
       z-index: 1;
+      overflow: hidden;              /* clip the full-bleed marquee */
     }
-
-    .deeptech-caption {
-      text-align: center;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: clamp(13px, 1vw, 16px);
-      letter-spacing: 0.2em;
-      color: rgba(255, 255, 255, 0.92);
-      /* Margin from viewport edge is handled by the section container. */
-      padding: 0;
-      margin: 0 0 clamp(-30px, -3vw, -14px) 0;
-      position: relative;
-      z-index: 2;
-      text-shadow: 0 0 12px rgba(35, 38, 52, 0.7);
+    /* Text: full-width left on small screens. On desktop its LEFT edge sits at
+       the horizontal centre of the content column (≈ screen centre) and it
+       fills the right half — so both heading and body are left-aligned from the
+       centre line, with a wide enough measure to wrap onto fewer lines. */
+    .think-text {
+      max-width: 500px;
+      margin: 0;
+      text-align: left;
     }
-
-    /* Desktop: more generous spacing — caption sits above the wide bloom
-       with breathing room and only a slight overlap onto its top edge. */
+    .think-heading {
+      font-family: 'Noto Serif Display', serif;
+      font-weight: 300;
+      font-size: clamp(26px, 3.2vw, 40px);
+      line-height: 1.16;
+      letter-spacing: -0.005em;
+      color: #FFFFFF;
+      text-align: left;
+      margin: 0 0 clamp(18px, 2.4vw, 30px);
+    }
+    .think-body {
+      font-family: 'Sora', sans-serif;
+      font-weight: 200;
+      font-size: clamp(14px, 1.05vw, 16px);      /* uniform page body copy */
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.85);
+      text-align: left;
+      max-width: none;
+      margin: 0;
+    }
     @media (min-width: 1024px) {
-      .section-f {
-        padding: clamp(60px, 5vw, 100px) 0 0;
-      }
-      .deeptech-caption {
-        padding: 0;
-        margin: 0 0 clamp(-30px, -1.4vw, -16px) 0;
-      }
+      .think-text { margin-left: 50%; }   /* left edge at the centre line */
     }
 
-    /* Each letter starts hidden and is revealed by a glitch keyframe.
-       JS wraps each word in a .glitch-word and each letter in a
-       .glitch-letter, with regular spaces (text nodes) between word
-       wrappers. The .glitch-word's white-space: nowrap blocks soft-wrap
-       opportunities between sibling .glitch-letter inline-blocks within
-       a word, so words like "physics" never split mid-character. */
-    .deeptech-caption .glitch-word {
-      display: inline-block;
-      white-space: nowrap;
+    /* Full-bleed industry strip — an infinite marquee scrolling left→right.
+       The track holds two identical sets of the four tiles so the loop is
+       seamless. */
+    .sector-strip {
+      width: 100%;
+      margin-top: clamp(40px, 6vw, 84px);
+      overflow: hidden;
     }
-    .deeptech-caption .glitch-letter {
-      display: inline-block;
-      white-space: pre;
+    .sector-track {
+      display: flex;
+      width: max-content;
+      will-change: transform;
+      animation: sector-marquee 44s linear infinite;
+      animation-play-state: paused;               /* runs once revealed */
+    }
+    .sector-strip.in-view .sector-track { animation-play-state: running; }
+    @keyframes sector-marquee {
+      from { transform: translateX(-50%); }        /* second set showing */
+      to   { transform: translateX(0); }           /* first set — identical, seamless; motion is left→right */
+    }
+    .sector-tile {
+      position: relative;
+      flex: 0 0 auto;
+      width: clamp(280px, 40vw, 660px);
+      aspect-ratio: 16 / 9;
+      /* Trailing margin on EVERY tile (incl. last) → 8 equal segments, so the
+         translateX(-50%) marquee loop is exactly seamless. */
+      margin: 0 clamp(10px, 1.1vw, 18px) 0 0;
+      overflow: hidden;
+    }
+    .sector-tile img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    /* Bottom shade so the caption stays legible over any image. */
+    .sector-tile::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 45%;
+      background: linear-gradient(to top, rgba(6,6,14,0.72), rgba(6,6,14,0));
+      pointer-events: none;
+    }
+    .sector-tile figcaption {
+      position: absolute;
+      left: clamp(14px, 1.5vw, 26px);
+      bottom: clamp(12px, 1.3vw, 22px);
+      z-index: 1;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(11px, 1vw, 14px);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #FFFFFF;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sector-track { animation: none; transform: none; }
+    }
+
+    /* ===========================
+       Section G — Philosophy statement over the "trust" starburst bloom
+       =========================== */
+    /* Bloom band — the starburst shown at a reduced scale (centred, with the
+       dark section bg on either side, per the design). The JPEG is flattened
+       onto #06060E so it blends seamlessly; the vertical parallax drifts it
+       within the taller band. */
+    .phil-bloom {
+      position: relative;
+      width: 100%;
+      height: clamp(240px, 66vw, 400px);
+      background-image: url('images/trust_bloom.webp');
+      background-size: 92% auto;
+      background-position: center calc(50% + var(--parallax-y, 0px));
+      background-repeat: no-repeat;
+      background-color: #06060E;
+      z-index: 1;
+    }
+    @media (min-width: 1024px) {
+      .phil-bloom {
+        /* Taller band gives the parallax vertical slack so the bloom never
+           drifts past the edge (which would expose the bg + crop the bloom). */
+        height: clamp(400px, 44vw, 660px);
+        background-size: 64% auto;
+      }
+    }
+    /* Bright bloom orb (bloom.webp) overlaid on the base scene. Starts small +
+       hidden; JS scales it 20%→100% + fades it in (ease-out). Position/size
+       tunable via the --orb-* vars. */
+    .phil-bloom-orb {
+      position: absolute;
+      left: var(--orb-x, 50%);
+      top: var(--orb-y, 48%);
+      width: var(--orb-w, 27%);
+      height: auto;
+      transform: translate(-50%, -50%) scale(0.2);
       opacity: 0;
+      z-index: 1;
+      pointer-events: none;
+      will-change: transform, opacity;
     }
-    .deeptech-caption.in-view .glitch-letter {
-      animation: letter-glitch 600ms cubic-bezier(.2,.6,.2,1) forwards;
-      animation-delay: var(--letter-delay, 0ms);
-    }
-
-    @keyframes letter-glitch {
-      0%   { opacity: 0;    transform: translate3d(-2px, 0, 0); color: #FFFFFF;
-             text-shadow: none; }
-      14%  { opacity: 0.45; transform: translate3d( 2px, 0, 0); color: rgba(229,115,102,0.95);
-             text-shadow: 0 0 14px rgba(229,115,102,0.45); }
-      26%  { opacity: 0.18; transform: translate3d(-1px, 0, 0); color: rgba(180,215,255,0.7);
-             text-shadow: 0 0 6px rgba(180,215,255,0.4); }
-      40%  { opacity: 0.7;  transform: translate3d( 1px, 0, 0); color: rgba(255,255,255,0.9);
-             text-shadow: 0 0 4px rgba(255,255,255,0.3); }
-      55%  { opacity: 0.4;  transform: translate3d( 0,    0, 0); color: rgba(229,115,102,0.55); }
-      72%  { opacity: 0.85; transform: translate3d( 0,    0, 0); color: rgba(255,255,255,0.95); }
-      100% { opacity: 1;    transform: translate3d( 0,    0, 0); color: #FFFFFF;
-             text-shadow: 0 0 8px rgba(255,255,255,0.22); }
-    }
-
-    /* Particle canvas overlay — radiating particles from the three circles
-       in the deep-tech bloom. Sits on top of the background image. */
-    .deeptech-particles {
+    /* Particle burst canvas — sparks radiate from the bloom centre (drawn in JS,
+       over the image, beneath the philosophy text). */
+    .phil-particles {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 1;
-    }
-
-    /* Bloom band — single image (`deeptech_bloom.webp`) for both mobile
-       and desktop.
-       Mobile (<1024px): a fixed-height container with `background-size: cover`.
-       Because the image's natural aspect (1.764, landscape) is wider than the
-       container's aspect (close to square on a phone), `cover` scales the
-       image to fit the container HEIGHT — so the full vertical extent of the
-       image is preserved (top + bottom edges intact) and only the SIDES are
-       cropped. The viewer sees the centre bloom dominant.
-       Desktop (≥1024px): the full image at its natural aspect, no cropping. */
-    .deeptech-bloom-wrap {
-      width: 100%;
-      height: clamp(280px, 48vh, 420px);
-      background-image: url('images/deeptech_bloom.webp');
-      background-size: cover;
-      background-position: center center;
-      background-repeat: no-repeat;
-      overflow: hidden;
-      position: relative;
-      z-index: 1;
-    }
-
-    @media (min-width: 1024px) {
-      .deeptech-bloom-wrap {
-        height: auto;
-        aspect-ratio: 3000 / 1701;
-        /* Slight overscale (was `cover` ≡ 100% at this exact aspect) gives
-           the parallax controller vertical room to drift. */
-        background-size: 112%;
-        background-position: center calc(50% + var(--parallax-y, 0px));
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .deeptech-caption .glitch-letter {
-        opacity: 1 !important;
-        animation: none !important;
-        transform: none !important;
-      }
-    }
-
-    /* ===========================
-       Section G — Philosophy statement
-       =========================== */
-    .section-g {
-      background-color: transparent;              /* let the image show through the overlap */
-      /* Mobile: tight bottom padding, moderate overlap into the bloom's
-         bottom fade — keeps the entire F+G group within one viewport. */
-      padding: 0 0 clamp(20px, 5vw, 40px);
-      margin-top: clamp(-60px, -6vw, -30px);
-      position: relative;
       z-index: 2;
     }
+    /* Philosophy text is held hidden until the bloom peaks (JS adds .phil-in). */
+    .phil-content {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 800ms cubic-bezier(.2,.6,.2,1), transform 800ms cubic-bezier(.2,.6,.2,1);
+    }
+    .phil-content.phil-in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .phil-content { opacity: 1 !important; transform: none !important; }
+      .phil-bloom-orb { opacity: 1 !important; transform: translate(-50%, -50%) scale(1) !important; }
+    }
 
-    /* Mobile: extra breathing room above the deep-tech caption and below
-       the philosophy statement, so each text block sits with clear empty
-       space rather than feeling pinched between the surrounding sections. */
+    .section-g {
+      background-color: #06060E;
+      padding: 0 0 clamp(48px, 8vw, 96px);
+      position: relative;
+      z-index: 2;
+      overflow: hidden;
+    }
+    /* Philosophy + CTA overlap up into the bloom's lower fade. */
+    .phil-content {
+      position: relative;
+      z-index: 2;
+      margin-top: clamp(-70px, -9vw, -120px);
+    }
+
     @media (max-width: 767px) {
-      .section-f { padding-top: 120px; }
-      .section-g { padding-bottom: 120px; }
+      .section-g { padding-bottom: 80px; }
     }
 
     .philosophy {
@@ -1125,99 +1512,74 @@
       font-family: 'Noto Serif Display', serif;
       font-weight: 300;
       font-style: normal;
-      /* Mobile: ~30% smaller than the desktop max (52px × 0.7 ≈ 36px). */
-      font-size: clamp(28px, 7.5vw, 36px);
-      line-height: 1.1;
+      font-size: clamp(26px, 3.2vw, 40px);      /* matches the section headers */
+      line-height: 1.16;
       letter-spacing: -0.005em;
       color: #FFFFFF;
-      max-width: 920px;
+      /* Wide enough that "Operational knowledge becomes measurable efficiency."
+         fits on one line (the <br> then puts "Ownership stays with you." on
+         line two). */
+      max-width: 1150px;
       /* Margin from viewport edge is handled by the section container. */
       padding: 0;
       margin: 0 auto;
-      text-shadow: 0 0 16px rgba(35, 38, 52, 0.6);
+      text-shadow: 0 0 16px rgba(6, 6, 14, 0.6);
     }
 
-    /* Highlighted "key" words — italic + warm accent. */
-    .philosophy .key {
-      font-style: italic;
-      font-weight: 300;
-      color: #E57366;
+    /* Mono sub-line under the philosophy headline (JetBrains Mono), revealed
+       letter-by-letter (same glitch effect as the ontology flow words). */
+    .phil-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+      font-size: clamp(12px, 1.05vw, 15px);
+      line-height: 1.7;
+      letter-spacing: 0.01em;
+      color: rgba(255, 255, 255, 0.72);
+      text-align: center;
+      max-width: none;
+      white-space: nowrap;              /* keep it on a single line (desktop) */
+      margin: clamp(18px, 2.2vw, 30px) auto 0;
+    }
+
+    /* "Become a partner" CTA under the philosophy line. */
+    .partner-wrap {
+      text-align: center;
+      margin-top: clamp(28px, 4vw, 44px);
+    }
+    .cta-partner {
+      display: inline-block;
+      padding: 12px 28px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      color: #FFFFFF;
+      background: transparent;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(11px, 1vw, 13px);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: background-color 300ms ease, border-color 300ms ease, color 300ms ease;
+    }
+    .cta-partner::after,
+    .btn-cta::after,
+    .form-submit::after {
+      content: '\2192';                 /* → arrow, per the design */
+      margin-left: 0.7em;
+      display: inline-block;
+    }
+    .cta-partner:hover {
+      background-color: rgba(255, 255, 255, 0.10);
+      border-color: rgba(255, 255, 255, 0.7);
+      color: #FFFFFF;
     }
 
     /* ===========================
        Section H — Footer / CTA
        =========================== */
+    /* Plain dark footer (per the design — no line-art background). */
     .section-h {
       position: relative;
-      background-color: #232634;
+      background-color: #1C1C23;   /* lighter fill segments the footer + lifts the form fields */
       padding: clamp(60px, 9vw, 140px) 0 0;
-      overflow: hidden;
-    }
-
-    /* Dark "floor" at the bottom of the section so the line-art image
-       dissolves into a colour close to its own bottom edge instead of
-       meeting the navy section bg with a visible seam. Sits BEHIND the
-       image (z-0 vs z-1), so the image still reads at 75% opacity on
-       top of it. On mobile the floor also fills the 90px image-lift gap
-       below the image so the locations + copyright text sit on the
-       darker floor instead of plain navy. */
-    .footer-floor {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: clamp(110px, 12vw, 200px);
-      background-color: #191A24;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    /* Industrial line-art background image at the bottom of the section.
-       Tall enough to show the full skyline silhouette per the designs. */
-    .footer-bg {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      width: 100%;
-      height: clamp(320px, 42vw, 620px);
-      background-image: url('images/footer_img_mono.webp');
-      background-size: cover;
-      /* Anchored to bottom; --parallax-y (set on desktop only) drifts it
-         vertically as the user scrolls into Section H. */
-      background-position: center calc(100% + var(--parallax-y, 0px));
-      background-repeat: no-repeat;
-      opacity: 0.75;
-      z-index: 1;
-      pointer-events: none;
-    }
-    /* Short top fade so the line-art dissolves into the section bg without
-       hiding the silhouette itself. */
-    .footer-bg::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to bottom,
-        rgba(35, 38, 52, 1) 0%,
-        rgba(35, 38, 52, 0) 18%);
-      pointer-events: none;
-    }
-    /* Mobile: lift the line-art bg so its bottom edge sits above the
-       locations + copyright lines instead of running behind them, and
-       add a bottom-fade pseudo-element so the dark "ground" portion of
-       the image dissolves into the floor colour (#191A24) instead of
-       sitting as a hard dark band over the lighter floor. */
-    @media (max-width: 767px) {
-      .footer-bg { bottom: 90px; }
-      .footer-bg::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(to bottom,
-          rgba(25, 26, 36, 0) 75%,
-          rgba(25, 26, 36, 1) 100%);
-        pointer-events: none;
-      }
     }
 
     .footer-content {
@@ -1229,7 +1591,7 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: clamp(40px, 5vw, 80px);
-      padding-bottom: clamp(280px, 36vw, 520px);  /* leaves room for the taller line-art */
+      padding-bottom: clamp(64px, 8vw, 120px);   /* modest gap before locations/copyright */
     }
     /* Mobile: extra breathing room between the invitation text ("Join us
        on our journey") and the contact form below it. */
@@ -1238,52 +1600,60 @@
     }
     @media (min-width: 1024px) {
       .footer-grid {
-        grid-template-columns: 1fr 1.1fr;
-        gap: clamp(48px, 6vw, 100px);
+        grid-template-columns: 1fr 1px 1fr;   /* equal columns → divider dead-centre */
+        gap: clamp(36px, 4.5vw, 76px);
+      }
+    }
+
+    /* Vertical dotted divider between the two footer columns (desktop only). */
+    .footer-divider { display: none; }
+    @media (min-width: 1024px) {
+      .footer-divider {
+        display: block;
+        align-self: stretch;                     /* full height of the taller column */
+        width: 1px;
+        background-image: linear-gradient(to bottom, rgba(255,255,255,0.32) 0 2px, transparent 2px 8px);
+        background-size: 1px 8px;
+        background-repeat: repeat-y;
       }
     }
 
     .footer-col h3 {
       font-family: 'Noto Serif Display', serif;
       font-weight: 300;
-      font-size: 60px;
-      line-height: 1.04;
+      font-size: clamp(26px, 3.2vw, 40px);
+      line-height: 1.16;
       letter-spacing: -0.005em;
       color: #FFFFFF;
       margin: 0 0 clamp(20px, 2.5vw, 32px) 0;
     }
     .footer-col h3 .h2-line { display: block; }
 
-    /* Mobile-only heading downscale: .h1-display, .h2-display,
-       .intel-heading, and .footer-col h3 all drop to 48px below 768px.
-       Placed AFTER the base rules for all four so source order wins the
-       cascade (selectors are equal specificity; media queries don't add
-       any). For .h1-display this overrides the clamp() floor of 50px. */
+    /* Mobile-only hero title downscale: .h1-display drops to 44px below 768px.
+       Placed AFTER the base rule so source order wins the cascade. Section
+       headers use the shared clamp(26px,3.2vw,40px) and need no override. */
     @media (max-width: 767px) {
-      .h1-display,
-      .h2-display,
-      .intel-heading,
-      .footer-col h3 { font-size: 48px; }
+      .h1-display { font-size: 44px; }
     }
 
     .footer-col p {
       font-family: 'Sora', sans-serif;
       font-weight: 200;
-      font-size: clamp(15px, 1.18vw, 18px);
-      line-height: 1.6;
+      font-size: clamp(14px, 1.05vw, 16px);      /* uniform page body copy */
+      line-height: 1.55;
       color: rgba(255, 255, 255, 0.85);
-      max-width: 52ch;
+      max-width: 34ch;
       margin: 0;
     }
 
     .footer-col a {
-      color: #E57366;
+      color: #FFFFFF;
       text-decoration: underline;
       text-underline-offset: 3px;
       transition: color 0.2s ease;
     }
     .footer-col a:hover,
-    .footer-col a:focus { color: #FFA398; }
+    .footer-col a:focus { color: rgba(255, 255, 255, 0.7); }
 
     /* Contact form */
     .contact-form {
@@ -1367,7 +1737,7 @@
     .form-field input:focus,
     .form-field select:focus,
     .form-field textarea:focus {
-      border-color: rgba(229, 115, 102, 0.7);
+      border-color: rgba(255, 255, 255, 0.55);
       background: rgba(255, 255, 255, 0.06);
     }
     .form-field input::placeholder,
@@ -1393,19 +1763,18 @@
       background-repeat: no-repeat;
       padding-right: 36px;
     }
-    .form-field select option { background: #232634; color: #FFFFFF; }
+    .form-field select option { background: #06060E; color: #FFFFFF; }
 
     /* Submit button */
     .form-submit {
       align-self: flex-end;
       margin-top: clamp(12px, 1.5vw, 20px);
-      font-family: 'Sora', sans-serif;
-      font-weight: 300;
-      font-size: 14px;
-      letter-spacing: 0.02em;
-      padding: 13px 32px;
-      border: 1px solid rgba(255, 255, 255, 0.55);
-      border-radius: 4px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(11px, 1vw, 13px);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      padding: 12px 28px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
       background: transparent;
       color: #FFFFFF;
       cursor: pointer;
@@ -1414,16 +1783,25 @@
       transition:
         opacity      700ms cubic-bezier(.2,.6,.2,1) 1250ms,
         transform    700ms cubic-bezier(.2,.6,.2,1) 1250ms,
-        border-color 0.25s ease,
-        color        0.25s ease,
-        box-shadow   0.25s ease;
+        border-color     0.25s ease,
+        color            0.25s ease,
+        background-color 0.25s ease;
     }
     .contact-form.in-view .form-submit { opacity: 1; transform: translateY(0); }
     .form-submit:hover,
     .form-submit:focus {
-      border-color: #E57366;
-      color: #E57366;
-      box-shadow: 0 0 22px rgba(229, 115, 102, 0.25);
+      background-color: rgba(255, 255, 255, 0.10);
+      border-color: rgba(255, 255, 255, 0.7);
+      color: #FFFFFF;
+    }
+
+    /* Small M-mark centred above the locations line (per the design). */
+    .footer-mark {
+      display: block;
+      width: clamp(30px, 3vw, 42px);
+      height: auto;
+      margin: 0 auto clamp(14px, 1.6vw, 22px);
+      opacity: 0.92;
     }
 
     .footer-locations {
@@ -1461,50 +1839,21 @@
       }
     }
 
-    /* Word-by-word reveal for the philosophy statement. JS wraps each word
-       in a .phil-word span and sets --word-delay; the .in-view class is
-       added by an IntersectionObserver when the section enters the viewport. */
-    .philosophy .phil-word {
-      display: inline-block;
-      opacity: 0;
-      transform: translateY(8px);
-      white-space: pre;
-    }
-    .philosophy.in-view .phil-word {
-      animation: phil-word-fade 700ms cubic-bezier(.2,.6,.2,1) forwards;
-      animation-delay: var(--word-delay, 0ms);
-    }
-    @keyframes phil-word-fade {
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .philosophy .phil-word {
-        opacity: 1 !important;
-        transform: none !important;
-        animation: none !important;
-      }
-    }
 
     /* Desktop: philosophy is pulled up significantly so it visibly overlaps
        the bottom edge of the wide bloom — the user sees both image and
        philosophy in the same scroll position. */
     @media (min-width: 1024px) {
-      .section-g {
-        padding: 0 0 clamp(80px, 8vw, 140px);
-        margin-top: clamp(-180px, -10vw, -90px);
-      }
-      .philosophy {
-        padding: 0;
-        font-size: clamp(38px, 4vw, 52px);
-      }
+      .section-g { padding-bottom: clamp(90px, 9vw, 150px); }
+      .phil-content { margin-top: clamp(-170px, -11vw, -100px); }
+      .philosophy { padding: 0; }
     }
 
     /* Generic scroll-triggered fade-up reveal — used for Sections B/C/D
-       (caption block, "We are MatterMind" content, and divider stage).
+       (caption block, "We are MatterMind" content, "think" heading + body).
        Each element opts in by adding the .reveal-up class; an IntersectionObserver
        in JS adds .in-view when it enters the viewport. Optional per-element
-       stagger via --reveal-delay. Matches the Section E/G motion language. */
+       stagger via --reveal-delay. Matches the Section G motion language. */
     .reveal-up {
       opacity: 0;
       transform: translateY(18px);
@@ -1533,16 +1882,36 @@
   <!-- =========================================
        HERO SECTION
        ========================================= -->
-  <section class="hero" data-parallax="0.18">
+  <section class="hero">
 
-    <!-- Top blue gradient overlay (#446D9F 100% -> 0%) -->
+    <!-- Hero background video (V2). Autoplay/muted/loop/playsinline are all
+         required to play inline on iOS without a tap. Poster preloaded in
+         <head>. Wrapped in .hero-bg-fade so the load fade-in (wrapper)
+         doesn't conflict with the scroll-linked opacity (on the video). -->
+    <div class="hero-bg-fade" aria-hidden="true">
+      <video
+        id="heroVideo"
+        class="hero-bg"
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="auto"
+        poster="videos/hero-bg.webp">
+        <source src="videos/hero-bg.webm" type="video/webm" />
+        <source src="videos/hero-bg.mp4"  type="video/mp4" />
+      </video>
+    </div>
+
+    <!-- Top header gradient overlay (#000000 100% -> 0%, V2) -->
     <div class="hero-gradient" aria-hidden="true"></div>
-
-    <!-- Particle emission canvas — sits between image and content -->
-    <canvas id="particleCanvas" class="hero-particles" aria-hidden="true"></canvas>
 
     <!-- Bottom fade into page background -->
     <div class="hero-fade" aria-hidden="true"></div>
+
+    <!-- Scroll-linked darken overlay (V2): fades in 0 → 0.55 black as the
+         user scrolls into the feature reel below. Reversible on scroll up. -->
+    <div class="hero-darken" aria-hidden="true"></div>
 
     <!-- HERO CONTENT -->
     <div class="hero-content">
@@ -1559,7 +1928,7 @@
           <!-- Desktop Nav — absolutely centred on the viewport so 'Intelligence' aligns with the M-mark below -->
           <ul class="hidden md:flex items-center gap-8 lg:gap-12 nav-list absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <li><a href="#vision" class="nav-link">Vision</a></li>
-            <li><a href="#intelligence" class="nav-link">Intelligence</a></li>
+            <li><a href="#install" class="nav-link">Intelligence</a></li>
             <li><a href="#join" class="nav-link">Join Us</a></li>
           </ul>
 
@@ -1576,7 +1945,7 @@
         <div id="mobileNav" class="md:hidden">
           <ul>
             <li><a href="#vision" class="nav-link">Vision</a></li>
-            <li><a href="#intelligence" class="nav-link">Intelligence</a></li>
+            <li><a href="#install" class="nav-link">Intelligence</a></li>
             <li><a href="#join" class="nav-link">Join Us</a></li>
             <li><a href="#contact" class="nav-link">Get in touch</a></li>
           </ul>
@@ -1589,11 +1958,11 @@
       <!-- Hero text block — always presents underneath the M-mark -->
       <div class="hero-text">
         <h1 class="h1-display">
-          <span class="word">Fusing</span>
-          <span class="word">intelligence</span>
-          <span class="word">into</span>
+          <span class="word">Building</span>
           <span class="word">the</span>
-          <span class="italic-line"><span class="word">foundations</span> <span class="word">of</span> <span class="word">reality.</span></span>
+          <span class="word">intelligence</span>
+          <span class="word">layer</span>
+          <span class="h1-line-2"><span class="word">for</span> <span class="word">the</span> <span class="italic-line"><span class="word">physical</span> <span class="word">economy.</span></span></span>
         </h1>
         <p class="intro-text mt-5 md:mt-6 mx-auto max-w-[34ch] lg:max-w-none lg:whitespace-nowrap">
           Bringing perception, reasoning, and autonomy into the systems that shape the physical world.
@@ -1603,107 +1972,128 @@
   </section>
 
   <!-- =========================================
-       SECTION B + C — Quantum Bloom + "We are MatterMind"
-       Combined stage so caption overlays the bloom on the left and
-       the C content overlays it on the right (desktop). They stack on mobile.
+       FEATURE REEL — tap-to-play video
+       preload="none" → zero video bytes fetched until user taps play.
+       Only the poster image (feature_reel_poster.webp) loads on page load.
+       playsinline lets iOS play inline rather than forcing fullscreen.
+       JS adds the `controls` attribute on first tap so users can pause/scrub.
        ========================================= -->
-  <section class="section-bc">
-    <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
-      <div class="bc-stage">
+  <!-- Curve band wraps sections 2–4 so ONE continuous curved line sits behind
+       the feature reel, turbine and ontology. -->
+  <div class="curve-band">
+    <img class="page-curve" src="images/curved_line.svg" alt="" aria-hidden="true" />
 
-        <!-- Bloom -->
-        <div class="bloom-wrap" role="img" aria-label="Quantum bloom — pixelated energy on the left refining into high-resolution intelligence on the right" data-parallax="0.08">
-          <!-- BEGIN: bloom right-half pulse (HTML) — remove this canvas to disable -->
-          <canvas id="bloomPulse" class="bloom-pulse" aria-hidden="true"></canvas>
-          <!-- END: bloom right-half pulse (HTML) -->
-        </div>
-
-        <!-- Caption — overlays bloom on the left (desktop), stacks below (mobile). -->
-        <div class="caption-block">
-          <span class="caption-rule" aria-hidden="true"></span>
-          <p class="caption-tag">QUANTUM BLOOMS:</p>
-          <p class="caption-text">
-            Intelligence awakens where none was before &mdash; Luminous, intricate patterns unfurling from a swirling, almost primordial energy, suggesting perception, knowledge and reasoning coalescing from the fundamental.
-          </p>
-        </div>
-
-        <!-- We are MatterMind — overlays bloom on the right (desktop), stacks below (mobile) -->
-        <!-- id="vision" sits on .c-content so the "Vision" nav link
-             scrolls the user to the "We are MatterMind" header. -->
-        <div id="vision" class="c-content reveal-up" style="--reveal-delay: 150ms;">
-          <h2 class="h2-display">
-            <span class="h2-line">We are</span>
-            <span class="h2-line">MatterMind</span>
-          </h2>
-          <div class="body-copy">
-            <p>We are building intelligence embedded within physical matter systems that perceive cause and effect, learn from it, and continuously evolve to shape better realities.</p>
-            <p>We are reframing intelligence into the fundamental properties of the universe to change how we understand what it means to think, learn, and exist.</p>
-            <p class="body-fine">Physical systems generate vast signals. They still rely on static rules and human judgement under pressure. MatterMind provides a disciplined layer between observation and action.</p>
-          </div>
-        </div>
-
+  <section class="feature-reel" aria-label="MatterMind feature reel">
+    <div class="feature-reel-container">
+      <div class="feature-reel-frame">
+        <video
+          id="featureReel"
+          class="feature-reel-video"
+          preload="none"
+          playsinline
+          poster="videos/feature_reel_poster.webp">
+          <!-- WebM listed first so Chrome/Firefox/Edge prefer the smaller file;
+               Safari ignores it and falls back to the MP4. -->
+          <source src="videos/feature_reel.webm" type="video/webm" />
+          <source src="videos/feature_reel.mp4"  type="video/mp4" />
+        </video>
+        <button
+          id="featureReelPlay"
+          class="feature-reel-play"
+          type="button"
+          aria-label="Play feature reel">
+          <img src="images/play_btn.svg" alt="" aria-hidden="true" />
+        </button>
       </div>
     </div>
   </section>
 
   <!-- =========================================
-       SECTION D — Divider / Horizon Layer
+       SECTION — "Connected Understanding" (turbine)
+       Text left, gas-turbine emission animation right (stacks on mobile).
        ========================================= -->
-  <section class="section-d">
-    <div class="divider-stage reveal-up" role="img" aria-label="Horizon divider">
-      <!-- BEGIN: divider particle effect (HTML) — remove this canvas to disable -->
-      <canvas id="dividerParticles" class="divider-particles" aria-hidden="true"></canvas>
-      <!-- END: divider particle effect (HTML) -->
-
-      <img src="images/mm_indent_small_grey.svg" alt="" class="divider-mark" aria-hidden="true" loading="lazy" decoding="async" />
-
-      <div class="divider-label-row divider-label-row-top">
-        <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
-          <p class="divider-label">OBSERVATION</p>
-        </div>
-      </div>
-      <div class="divider-label-row divider-label-row-bottom">
-        <div class="max-w-[1650px] mx-auto px-10 md:px-6 lg:px-8">
-          <p class="divider-label">ACTION</p>
+  <section id="vision" class="section-ci">
+    <!-- Turbine centred in the page; heading overlays on the left (desktop),
+         turbine sits below the text on mobile. Layering inside .ci-visual:
+         turbine image (behind) → curved line → emission lines/text (front). -->
+    <div class="ci-visual" aria-hidden="true">
+      <img class="turbine-still" src="images/turbine.png" alt="" />
+      <canvas id="turbineCanvas" class="turbine-canvas turbine-emit"></canvas>
+      <img class="ci-mark" src="images/mm_192.svg" alt="" />
+    </div>
+    <div class="ci-inner max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+      <div class="ci-text">
+        <h2 class="ci-heading ci-rise">Our intelligence turns disconnected data into <span class="ci-em">Connected Understanding.</span></h2>
+        <div class="body-copy ci-rise" style="--rise-delay: 280ms;">
+          <p>The physical economy does not run on language. It runs on reality. MatterMind is building the intelligence layer for that reality.</p>
+          <p>Today&rsquo;s AI can reason through language, but the physical economy runs on systems, constraints, and real-world cause and effect. Its data, context, and operational knowledge remain fragmented across machines, models, processes, and people.</p>
+          <p style="font-weight: 400;">MatterMind creates a foundational layer for machine-readable industrial reality. Systems that learn from operations, understand cause and effect, and continuously evolve to shape better realities.</p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- =========================================
-       SECTION E — Our intelligence
+       SECTION — "MatterMind installs the intelligence layer"
+       Sticky ontology stage. Layers: refinery (fades in) → node canvas (grows
+       outward) → tray (auto clip-reveal) with ground line + OBSERVATION /
+       ACTION labels + centre M-mark. Boot readout plays over the tray.
        ========================================= -->
-  <section id="intelligence" class="section-e">
+  <section id="install" class="section-install">
+    <!-- One pinned composition: heading (top), ontology animation (middle),
+         flow line + benefits readout (bottom) — matching the design. -->
+    <div class="install-scroll">
+      <div class="install-stage">
+        <h2 class="install-heading">MatterMind installs the <em class="install-em">intelligence layer</em><br class="install-br"> physical systems have never had.</h2>
+
+        <div id="trayLayer" class="ontology-layer" aria-hidden="true"><img src="images/tray.png" alt="" loading="lazy" decoding="async" /></div>
+        <div id="refineryLayer" class="ontology-layer" aria-hidden="true"><img src="images/refinery.png" alt="" loading="lazy" decoding="async" /><span class="tower-beacon beacon-a"></span><span class="tower-beacon beacon-b"></span></div>
+        <canvas id="ontologyCanvas" aria-hidden="true"></canvas>
+        <div id="groundGrad" class="ground-gradient" aria-hidden="true"></div>
+        <div id="groundLine" class="ground-line" aria-hidden="true"></div>
+        <div id="obsLabel" class="ground-label" aria-hidden="true">OBSERVATION</div>
+        <div id="actLabel" class="ground-label" aria-hidden="true">ACTION</div>
+
+        <!-- Boot readout: top line loads the flow words fast and holds on
+             "Transformed"; bottom line then revolves the benefits one by one.
+             aria-hidden as it's a decorative animated echo of the list below. -->
+        <div class="install-outro" aria-hidden="true">
+          <div class="boot-flow"></div>
+          <div class="boot-benefit"></div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+  </div>
+  <!-- end .curve-band -->
+
+  <!-- =========================================
+       SECTION — "We are teaching infrastructure to think"
+       Right-aligned statement + full-bleed auto-scrolling industry strip.
+       ========================================= -->
+  <section id="think" class="section-think">
     <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
-      <h2 class="intel-heading">
-        <span class="h2-line">Our</span>
-        <span class="h2-line">intelligence&hellip;</span>
-      </h2>
+      <div class="think-text">
+        <h2 class="think-heading reveal-up">We are teaching infrastructure to think, across global industries.</h2>
+        <p class="think-body reveal-up" style="--reveal-delay: 180ms;">With Connected Understanding, MatterMind helps physical systems produce more, waste less, and operate smarter by eliminating hidden inefficiencies.</p>
+      </div>
+    </div>
 
-      <div class="intel-grid">
-        <article class="intel-card">
-          <div class="intel-card-content">
-            <p class="intel-card-tag">UNDERSTANDS</p>
-            <p class="intel-card-text">Executes bounded interventions with auditability, permissioning, and human control.</p>
-          </div>
-          <img src="images/panel1_img.svg" alt="" class="intel-card-icon" aria-hidden="true" loading="lazy" decoding="async" />
-        </article>
+    <!-- Full-bleed marquee. Two identical sets of the four tiles → seamless loop.
+         oil_gas + energy exist; the other two show a dark placeholder tile until
+         images/advanced_manufacturing.jpg and images/heavy_industries.jpg are added. -->
+    <div class="sector-strip reveal-up" aria-label="Industries we serve">
+      <div class="sector-track">
+        <figure class="sector-tile"><img src="images/oil_gas.jpg" alt="Oil and gas facility" loading="lazy" decoding="async" onerror="this.style.display='none'" /><figcaption>Oil &amp; Gas</figcaption></figure>
+        <figure class="sector-tile"><img src="images/energy.jpg" alt="Energy infrastructure" loading="lazy" decoding="async" onerror="this.style.display='none'" /><figcaption>Energy Infrastructure</figcaption></figure>
+        <figure class="sector-tile"><img src="images/advanced_manufacturing.jpg" alt="Advanced manufacturing" loading="lazy" decoding="async" onerror="this.style.display='none'" /><figcaption>Advanced Manufacturing</figcaption></figure>
+        <figure class="sector-tile"><img src="images/heavy_industries.jpg" alt="Heavy industries" loading="lazy" decoding="async" onerror="this.style.display='none'" /><figcaption>Heavy Industries</figcaption></figure>
 
-        <article class="intel-card">
-          <div class="intel-card-content">
-            <p class="intel-card-tag">REASONS</p>
-            <p class="intel-card-text">Evaluates options, forecasts outcomes, and validates decisions before change.</p>
-          </div>
-          <img src="images/panel2_img.svg" alt="" class="intel-card-icon" aria-hidden="true" loading="lazy" decoding="async" />
-        </article>
-
-        <article class="intel-card">
-          <div class="intel-card-content">
-            <p class="intel-card-tag">ACTS SAFELY</p>
-            <p class="intel-card-text">Our intelligence maintains a structured model of assets, states, constraints, and dependencies.</p>
-          </div>
-          <img src="images/panel3_img.svg" alt="" class="intel-card-icon" aria-hidden="true" loading="lazy" decoding="async" />
-        </article>
+        <figure class="sector-tile" aria-hidden="true"><img src="images/oil_gas.jpg" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" /><figcaption>Oil &amp; Gas</figcaption></figure>
+        <figure class="sector-tile" aria-hidden="true"><img src="images/energy.jpg" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" /><figcaption>Energy Infrastructure</figcaption></figure>
+        <figure class="sector-tile" aria-hidden="true"><img src="images/advanced_manufacturing.jpg" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" /><figcaption>Advanced Manufacturing</figcaption></figure>
+        <figure class="sector-tile" aria-hidden="true"><img src="images/heavy_industries.jpg" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" /><figcaption>Heavy Industries</figcaption></figure>
       </div>
     </div>
   </section>
@@ -1711,23 +2101,25 @@
   <!-- =========================================
        SECTION F — Deep-tech band
        ========================================= -->
-  <section class="section-f">
-    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
-      <p class="deeptech-caption">MatterMind is an R&amp;D lab building physics aware AI systems.</p>
-    </div>
-    <div class="deeptech-bloom-wrap" aria-hidden="true" data-parallax="0.05">
-      <canvas id="deeptechParticles" class="deeptech-particles"></canvas>
-    </div>
-  </section>
-
   <!-- =========================================
-       SECTION G — Philosophy statement
+       SECTION — Philosophy statement over the "trust" starburst bloom.
+       Bloom band on top, then the philosophy statement (overlapping its lower
+       fade) and the "Become a partner" CTA.
        ========================================= -->
   <section class="section-g">
-    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+    <div class="phil-bloom" aria-hidden="true" data-parallax="0.12">
+      <img class="phil-bloom-orb" src="images/bloom.webp" alt="" aria-hidden="true" />
+      <canvas class="phil-particles" aria-hidden="true"></canvas>
+    </div>
+    <div class="phil-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
       <p class="philosophy">
-        <em class="key">Correctness</em> before growth. <em class="key">Simulation</em> before action. <em class="key">Trust</em> before autonomy.
+        Operational knowledge becomes measurable efficiency.<br>
+        Ownership stays with you.
       </p>
+      <p class="phil-sub">Correctness before growth. Simulation before action. Trust before autonomy.</p>
+      <div class="partner-wrap">
+        <a class="cta-partner" href="#contact">Become a partner</a>
+      </div>
     </div>
   </section>
 
@@ -1735,10 +2127,6 @@
        SECTION H — Footer / CTA
        ========================================= -->
   <section id="join" class="section-h">
-    <!-- Industrial line-art background sits at the bottom of the section. -->
-    <div class="footer-floor" aria-hidden="true"></div>
-    <div class="footer-bg" aria-hidden="true" data-parallax="0.10"></div>
-
     <div class="footer-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
       <div class="footer-grid">
 
@@ -1752,6 +2140,8 @@
             We are seeking individuals who possess the rare combination of technical mastery combined with physical curiosity. <a href="mailto:support@mattermind.ai">Join us</a> on our journey.
           </p>
         </div>
+
+        <div class="footer-divider" aria-hidden="true"></div>
 
         <!-- Right column — contact form -->
         <div class="footer-col" id="contact">
@@ -1806,6 +2196,7 @@
 
       </div>
 
+      <img class="footer-mark" src="images/mm_indent.png" alt="MatterMind" width="44" decoding="async" />
       <p class="footer-locations">New York&nbsp;|&nbsp;London&nbsp;|&nbsp;Bangalore</p>
       <p class="footer-copyright">© 2026 MatterMind Ltd.</p>
     </div>
@@ -1851,129 +2242,26 @@
       });
     })();
 
-    // Section E — reveal the three intelligence cards in sequence when the
-    // section scrolls into view. Stagger is handled in CSS via :nth-child.
+    // Section 6 — philosophy mono sub-line: build the letters up front (hidden)
+    // and expose a reveal fn. The bloom coordinator calls it at the bloom peak
+    // so the letter-by-letter glitch fires together with the particles.
     (function () {
-      const section = document.querySelector('.section-e');
-      if (!section) return;
-      const cards = section.querySelectorAll('.intel-card');
-      if (!cards.length) return;
-      // Fall back to immediate reveal if IntersectionObserver isn't supported.
-      if (!('IntersectionObserver' in window)) {
-        cards.forEach(c => c.classList.add('in-view'));
-        return;
-      }
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            cards.forEach(c => c.classList.add('in-view'));
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.35, rootMargin: '0px 0px -80px 0px' });
-      observer.observe(section);
-    })();
-
-    // Section F — glitch reveal: split the caption into per-character spans
-    // and stagger their illuminate-to-life animation when scrolled into view.
-    (function () {
-      const caption = document.querySelector('.deeptech-caption');
-      if (!caption) return;
-
-      // Split into words so each word can be wrapped in a non-breaking
-      // .glitch-word — without this, every .glitch-letter inline-block
-      // creates a soft-wrap opportunity and words can split mid-character.
-      const words = caption.textContent.split(' ');
-      caption.textContent = '';
-      let letterIdx = 0;
-      words.forEach((word, wi) => {
-        if (wi > 0) caption.appendChild(document.createTextNode(' '));
-        const wordWrap = document.createElement('span');
-        wordWrap.className = 'glitch-word';
-        for (let i = 0; i < word.length; i++) {
-          const span = document.createElement('span');
-          span.className = 'glitch-letter';
-          span.textContent = word[i];
-          span.style.setProperty('--letter-delay', (letterIdx * 50) + 'ms');
-          wordWrap.appendChild(span);
-          letterIdx++;
-        }
-        caption.appendChild(wordWrap);
+      const el = document.querySelector('.phil-sub');
+      if (!el) return;
+      const text = el.textContent;
+      const STAGGER = 24;
+      el.textContent = '';
+      Array.from(text).forEach((ch, i) => {
+        const s = document.createElement('span');
+        s.className = 'flow-letter';
+        s.textContent = ch;
+        s.style.animationDelay = (i * STAGGER) + 'ms';
+        s.style.animationPlayState = 'paused';   // hold hidden until revealed
+        el.appendChild(s);
       });
-
-      if (!('IntersectionObserver' in window)) {
-        caption.classList.add('in-view');
-        return;
-      }
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            caption.classList.add('in-view');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.5 });
-      observer.observe(caption);
-    })();
-
-    // Section G — philosophy: wrap each word in a .phil-word span and stagger
-    // a fade-up animation when the user scrolls and the deep-tech band
-    // (caption + image) is visible on screen.
-    (function () {
-      const philosophy = document.querySelector('.philosophy');
-      if (!philosophy) return;
-
-      // Walk the existing children and wrap each word (and each <em class="key">
-      // element) in its own .phil-word span. Whitespace between words is preserved.
-      const original = Array.from(philosophy.childNodes);
-      philosophy.textContent = '';
-      original.forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const tokens = node.textContent.split(/(\s+)/);
-          tokens.forEach(tok => {
-            if (!tok.length) return;
-            if (/^\s+$/.test(tok)) {
-              philosophy.appendChild(document.createTextNode(tok));
-            } else {
-              const span = document.createElement('span');
-              span.className = 'phil-word';
-              span.textContent = tok;
-              philosophy.appendChild(span);
-            }
-          });
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-          // Wrap the element (e.g. <em class="key">) in a .phil-word span.
-          const span = document.createElement('span');
-          span.className = 'phil-word';
-          span.appendChild(node);
-          philosophy.appendChild(span);
-        }
-      });
-
-      // Stagger animation delays — 130ms per word.
-      const words = philosophy.querySelectorAll('.phil-word');
-      words.forEach((w, i) => {
-        w.style.setProperty('--word-delay', (i * 130) + 'ms');
-      });
-
-      if (!('IntersectionObserver' in window)) {
-        philosophy.classList.add('in-view');
-        return;
-      }
-
-      // Trigger the reveal when the philosophy itself is just starting to
-      // enter the viewport — that way the user actually witnesses the
-      // word-by-word fade as they scroll the line into view, rather than
-      // it firing before they get there.
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            philosophy.classList.add('in-view');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.25 });
-      observer.observe(philosophy);
+      window.__revealPhilSub = function () {
+        el.querySelectorAll('.flow-letter').forEach(l => { l.style.animationPlayState = 'running'; });
+      };
     })();
 
     // Section H — staggered fade-up reveal of the form fields when the
@@ -2037,314 +2325,762 @@
       });
     })();
 
-    // Section F — radiating particles from the three circles in the deep-tech
-    // bloom. Same lightweight pattern as the hero canvas: 30fps cap, additive
-    // blending inside the canvas (no mix-blend-mode), DPR cap at 1.5,
-    // halo+core two-pass draw, and a hard pause via IntersectionObserver so
-    // the rAF only runs while the bloom is on screen.
+    // Hero background video — V2 replaces the V1 particle canvas. The video
+    // is autoplay/muted/loop/playsinline (required for inline iOS playback);
+    // we add JS-level reduced-motion handling (CSS animation rules don't
+    // affect <video> playback) and pause when scrolled off-screen / tab
+    // hidden to save battery and decode cost.
     (function () {
-      const canvas = document.getElementById('deeptechParticles');
-      if (!canvas) return;
+      const video = document.getElementById('heroVideo');
+      if (!video) return;
+
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduced) return;
-
-      const ctx = canvas.getContext('2d');
-      const particles = [];
-      const MAX = 110;
-      const FRAME_MS = 1000 / 24;        // ambient effect — 24fps is plenty
-      let W = 0, H = 0;
-      let last = 0;
-      let running = false;
-      let rafId = 0;
-
-      // Emitter positions + ring radius are recomputed on resize so the
-      // particles spawn around the visible rings at any breakpoint. Each
-      // emitter has a rotation direction so adjacent rings spin opposite
-      // ways for visual variety.
-      let EMITTERS = [];
-      let sizeScale = 1.0;     // particles scale down on smaller viewports
-      function computeEmitters() {
-        const isWide = window.innerWidth >= 1024;
-        const xs    = isWide ? [0.25, 0.50, 0.75] : [0.10, 0.50, 0.90];
-        const ringR = isWide ? 0.095 : 0.13;
-        sizeScale   = isWide ? 1.0 : 0.62;
-        EMITTERS = [
-          { x: xs[0], y: 0.50, r: 255, g: 200, b: 178, dir:  1, ringR: ringR },
-          { x: xs[1], y: 0.50, r: 210, g: 225, b: 255, dir: -1, ringR: ringR },
-          { x: xs[2], y: 0.50, r: 255, g: 200, b: 178, dir:  1, ringR: ringR },
-        ];
+      if (reduced) {
+        // Poster image remains visible; no autoplay loop.
+        video.pause();
+        video.removeAttribute('autoplay');
+        return;
       }
 
-      function resize() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
-        const cssW = canvas.offsetWidth;
-        const cssH = canvas.offsetHeight;
-        canvas.width = Math.max(1, cssW * dpr);
-        canvas.height = Math.max(1, cssH * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.globalCompositeOperation = 'lighter';
-        W = cssW; H = cssH;
-        computeEmitters();
-      }
-
-      // Particles are stored in polar coordinates (angle, radius) relative to
-      // their emitter centre. Each frame angle += angularVel and radius +=
-      // radialVel — combined this traces a spiral outward, which is much
-      // cheaper than recomputing tangent/radial directions with atan2.
-      function spawn() {
-        const e = EMITTERS[Math.floor(Math.random() * EMITTERS.length)];
-        const ex = e.x * W;
-        const ey = e.y * H;
-        const ringRadius = e.ringR * W;
-        const startAngle = Math.random() * Math.PI * 2;
-        // Slowed another 20% — calmer, more elegant drift.
-        const angularVel = e.dir * (0.014 + Math.random() * 0.018);
-        const radialVel  = (0.55 + Math.random() * 1.05) * sizeScale;
-        // Trail length proportional to the ring so it scales with viewport.
-        const trail = ringRadius * (0.6 + Math.random() * 1.0);
-        particles.push({
-          sx: ex, sy: ey,
-          angle: startAngle,
-          radius: ringRadius + (Math.random() - 0.5) * 8 * sizeScale,
-          angularVel: angularVel,
-          radialVel:  radialVel,
-          startRadius: ringRadius,
-          maxRadius: ringRadius + trail,
-          // Particle size scales with viewport — smaller on mobile so the
-          // dots don't read oversized against the smaller canvas.
-          size: (0.8 + Math.random() * 1.35) * sizeScale,
-          r: e.r, g: e.g, b: e.b,
-        });
-      }
-
-      function tick(now) {
-        if (!running) return;
-        if (now - last >= FRAME_MS) {
-          last = now;
-          ctx.clearRect(0, 0, W, H);
-          if (particles.length < MAX && Math.random() < 0.7) {
-            spawn();
-            if (particles.length < 60) spawn();
-          }
-          for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.angle  += p.angularVel;
-            p.radius += p.radialVel;
-            if (p.radius >= p.maxRadius) { particles.splice(i, 1); continue; }
-
-            const x = p.sx + Math.cos(p.angle) * p.radius;
-            const y = p.sy + Math.sin(p.angle) * p.radius;
-
-            // Fade based on how far the particle has travelled from the ring
-            // (startRadius) to its maxRadius.
-            const travel = (p.radius - p.startRadius) / (p.maxRadius - p.startRadius);
-            let a;
-            if (travel < 0.15) {
-              const u = travel / 0.15;
-              a = u * (2 - u);
-            } else {
-              a = 1 - (travel - 0.15) / 0.85;
-            }
-            // Peak alpha 0.80 — ~15% less prominent than the previous 0.95.
-            a *= 0.80;
-
-            const rgb = p.r + ',' + p.g + ',' + p.b + ',';
-            // Three-pass draw — outer soft halo + inner halo + bright core —
-            // gives a graduated falloff so the particle edges read soft
-            // rather than as a hard halo ring.
-            ctx.fillStyle = 'rgba(' + rgb + (a * 0.10) + ')';
-            ctx.beginPath();
-            ctx.arc(x, y, p.size * 5.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = 'rgba(' + rgb + (a * 0.22) + ')';
-            ctx.beginPath();
-            ctx.arc(x, y, p.size * 2.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = 'rgba(' + rgb + a + ')';
-            ctx.beginPath();
-            ctx.arc(x, y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-        rafId = requestAnimationFrame(tick);
-      }
-
-      function start() {
-        if (running) return;
-        running = true;
-        last = 0;
-        rafId = requestAnimationFrame(tick);
-      }
-      function stop() {
-        running = false;
-        if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
-      }
-
-      resize();
-      window.addEventListener('resize', resize);
-
-      const ioTarget = canvas.parentElement || canvas;
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) start();
-          else                     stop();
-        });
-      }, { threshold: 0.05 });
-      observer.observe(ioTarget);
-
+      // Pause when the tab is hidden, resume on return.
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden) stop();
-      });
-    })();
-
-    // Particle emission from the bloom centre
-    (function () {
-      const canvas = document.getElementById('particleCanvas');
-      if (!canvas) return;
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduced) return;
-
-      const ctx = canvas.getContext('2d');
-      const particles = [];
-      // Mobile gets ~35% fewer particles than desktop (120 → 78).
-      const MAX = window.innerWidth >= 768 ? 120 : 78;
-      // Initial double-spawn threshold — scaled with MAX so the relative
-      // fill cadence stays consistent across viewports (was hardcoded 76).
-      const FILL_TO = Math.round(MAX * 0.633);
-      const FRAME_MS = 1000 / 24;   // throttle to ~24fps — gentler on GPU
-      let W = 0, H = 0;
-      let last = 0;
-      let running = true;
-      // Vertical centre of the emission strip as a fraction of canvas height.
-      // Mobile shifts this up to match the raised bloom + M-mark.
-      let emitYRatio = 0.5;
-
-      function resize() {
-        // Cap DPR — sub-2px particles look fine at 1x even on retina, and
-        // every step up squares the pixel count for clearRect / arc fills.
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.0);
-        const cssW = canvas.offsetWidth;
-        const cssH = canvas.offsetHeight;
-        canvas.width = Math.max(1, cssW * dpr);
-        canvas.height = Math.max(1, cssH * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.globalCompositeOperation = 'lighter';
-        W = cssW; H = cssH;
-        emitYRatio = window.innerWidth >= 768 ? 0.5 : 0.32;
-      }
-
-      function spawn() {
-        // Emit across the bright horizontal band of the bloom — ~45px tall.
-        const x = W * (0.10 + Math.random() * 0.80);
-        const y = H * emitYRatio + (Math.random() - 0.5) * 45;
-        // Colour follows position — blue on the left half, coral on the right.
-        const isBlue = x < W / 2;
-        // Random path in any direction so particles drift above and below the strip.
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 0.55 + Math.random() * 1.05;
-        particles.push({
-          x: x, y: y,
-          sx: x, sy: y,                              // spawn point — used for distance fade
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          maxDist: 140 + Math.random() * 160,
-          size: 0.7 + Math.random() * 1.0,
-          r: isBlue ? 180 : 255,
-          g: isBlue ? 215 : 200,
-          b: isBlue ? 255 : 185,
-        });
-      }
-
-      // Alpha curve: rises smoothly from 0 → 1 over the first ~18% of travel
-      // (elegant fade-in instead of a hard pop), then eases back to 0.
-      const FADE_IN_END = 0.18;
-      const FADE_OUT_RANGE = 1 - FADE_IN_END;
-
-      function tick(now) {
-        if (!running) return;
-        if (now - last >= FRAME_MS) {
-          last = now;
-          ctx.clearRect(0, 0, W, H);
-          if (particles.length < MAX && Math.random() < 0.75) {
-            spawn();
-            if (particles.length < FILL_TO) spawn();   // double-spawn while filling
-          }
-          for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            const dx = p.x - p.sx;
-            const dy = p.y - p.sy;
-            const distSq = dx * dx + dy * dy;
-            const maxSq = p.maxDist * p.maxDist;
-            if (distSq >= maxSq) { particles.splice(i, 1); continue; }
-            const t = distSq / maxSq;
-            // Smooth fade-in (quadratic ease-out) then linear fade-out.
-            let a;
-            if (t < FADE_IN_END) {
-              const u = t / FADE_IN_END;
-              a = u * (2 - u);                       // ease-out: rises fast, settles smoothly
-            } else {
-              a = 1 - (t - FADE_IN_END) / FADE_OUT_RANGE;
-            }
-            a *= 1.0;
-            const rgb = p.r + ',' + p.g + ',' + p.b + ',';
-            // Soft halo pass — 3x radius, low alpha.
-            ctx.fillStyle = 'rgba(' + rgb + (a * 0.28) + ')';
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
-            ctx.fill();
-            // Bright core pass.
-            ctx.fillStyle = 'rgba(' + rgb + a + ')';
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-        requestAnimationFrame(tick);
-      }
-
-      resize();
-      window.addEventListener('resize', resize);
-
-      // Pause the loop when the tab is hidden — saves battery and avoids
-      // a frame-rush when the user returns.
-      let started = false;
-      let tabHidden = false;
-      let onScreen = true;
-
-      function maybeRun() {
-        if (!started || tabHidden || !onScreen) {
-          running = false;
-          return;
-        }
-        if (!running) {
-          running = true;
-          last = 0;
-          requestAnimationFrame(tick);
-        }
-      }
-
-      document.addEventListener('visibilitychange', () => {
-        tabHidden = document.hidden;
-        maybeRun();
+        if (document.hidden) video.pause();
+        else                 video.play().catch(() => { /* autoplay may be blocked; poster shows */ });
       });
 
-      // Pause the loop while the hero is off-screen — previously the canvas
-      // kept ticking at 30fps for the entire scroll of the page, which was
-      // a major fps drain.
+      // Pause when the hero is off-screen — saves decode cost during scroll.
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((entries) => {
           entries.forEach(e => {
-            onScreen = e.isIntersecting;
-            maybeRun();
+            if (e.isIntersecting) video.play().catch(() => {});
+            else                  video.pause();
           });
         }, { threshold: 0 });
+        io.observe(video);
+      }
+    })();
+
+    // Ontology core (MatterMind installs section). Flat 2D Canvas: refinery
+    // layer fades in, then a node/edge/pulse network grows outward from the
+    // centre M-mark, then the ground line extends left→right with OBSERVATION
+    // and ACTION labels, and finally the tray reveals top-down. All progress
+    // is driven by scroll position through the section, with an IntersectionObserver
+    // pause when off-screen and a `prefers-reduced-motion` static fallback.
+    (function () {
+      const canvas = document.getElementById('ontologyCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const stage = document.querySelector('.install-stage');
+      const scrollSpace = document.querySelector('.install-scroll');
+      const refineryLayer = document.getElementById('refineryLayer');
+      const trayLayer = document.getElementById('trayLayer');
+      const groundLine = document.getElementById('groundLine');
+      const groundGrad = document.getElementById('groundGrad');
+      const obsLabel = document.getElementById('obsLabel');
+      const actLabel = document.getElementById('actLabel');
+      const outro = document.querySelector('.install-outro');
+      const installHeading = document.querySelector('.install-heading');
+      if (!scrollSpace || !refineryLayer || !trayLayer) return;
+      const refineryImg = refineryLayer.querySelector('img');
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function frac(x) { return x - Math.floor(x); }
+      function hsh(n)  { return frac(Math.sin(n * 127.1) * 43758.5453); }
+      function smoothstep(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+      function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
+      function ramp(p, a, b) { return Math.max(0, Math.min(1, (p - a) / (b - a))); }
+
+      const N_SPINE = 12, N_FILL = 130, N_CLUSTERS = 12;
+      const nodes = [], edges = [];
+
+      // spine
+      for (let i = 0; i < N_SPINE; i++) {
+        const mx = (-1 + (i / (N_SPINE - 1)) * 2) * 0.9 + (hsh(i + 3) - 0.5) * 0.12;
+        const my = (hsh(i + 9) - 0.5) * 0.20;
+        nodes.push({ mx, my, size: 2.2 + hsh(i) * 0.8 });
+      }
+      // ambient filler
+      for (let k = 0; k < N_FILL; k++) {
+        const u = hsh(k * 1.7 + 1) * 2 - 1;
+        const mx = Math.sign(u) * Math.pow(Math.abs(u), 1.3) * 0.98;
+        let my = (hsh(k * 2.3 + 11) - 0.5) * 1.0;
+        my *= 0.55 + 0.45 * Math.abs(my);
+        const edgeFade = 1 - 0.35 * Math.min(1, Math.abs(mx));
+        nodes.push({ mx, my, size: (1.0 + hsh(k + 5) * 1.0) * edgeFade });
+      }
+      // sub-clusters
+      const explicit = [];
+      for (let c = 0; c < N_CLUSTERS; c++) {
+        const cu = (c / (N_CLUSTERS - 1)) * 2 - 1;
+        const cmx = Math.sign(cu) * Math.pow(Math.abs(cu), 1.5) * 0.72 + (hsh(c * 3.7) - 0.5) * 0.12;
+        const cmy = (hsh(c * 5.1 + 2) - 0.5) * 0.62;
+        const ci = nodes.length;
+        nodes.push({ mx: cmx, my: cmy, size: 2.4 + hsh(c) * 0.9, cl: true });
+        const nSat = 8 + Math.floor(hsh(c * 2.3) * 5);
+        const sat = [];
+        for (let s = 0; s < nSat; s++) {
+          const ang = (s / nSat) * Math.PI * 2 + hsh(c * 7 + s) * 0.8;
+          const rad = 0.12 + hsh(c * 11 + s) * 0.12;
+          const smx = cmx + Math.cos(ang) * rad;
+          const smy = cmy + Math.sin(ang) * rad * 1.3;
+          const si = nodes.length;
+          nodes.push({ mx: smx, my: smy, size: 0.9 + hsh(si) * 0.8, cl: true });
+          sat.push(si);
+          explicit.push([ci, si]);
+        }
+        for (let s = 0; s < sat.length; s++) explicit.push([sat[s], sat[(s + 1) % sat.length]]);
+      }
+
+      const N = nodes.length;
+      for (let i = 0; i < N; i++) {
+        const dist = Math.min(1, Math.hypot(nodes[i].mx, nodes[i].my * 0.45));
+        let b = dist * 0.88 + (hsh(i * 1.9 + 4) - 0.5) * 0.12;
+        if (nodes[i].cl) b = Math.min(b, 0.5);
+        nodes[i].birth = Math.max(0, Math.min(0.92, b));
+      }
+      const seen = new Set();
+      function link(i, j, spoke) {
+        const key = Math.min(i, j) + '_' + Math.max(i, j);
+        if (!seen.has(key)) { seen.add(key); edges.push({ a: i, b: j, spoke: !!spoke }); }
+      }
+      for (let i = 0; i < N; i++) {
+        const a = nodes[i]; const d = [];
+        for (let j = 0; j < N; j++) {
+          if (j === i) continue;
+          const dx = nodes[j].mx - a.mx, dy = (nodes[j].my - a.my) * 1.35;
+          d.push([dx * dx + dy * dy, j]);
+        }
+        d.sort((p, q) => p[0] - q[0]);
+        for (let n = 0; n < 3; n++) link(i, d[n][1]);
+      }
+      for (const [a, b] of explicit) link(a, b, true);
+
+      const NPULSE = 90;
+      const pulses = [];
+      for (let i = 0; i < NPULSE; i++) {
+        pulses.push({ e: Math.floor(Math.random() * edges.length), t: Math.random(),
+          dir: Math.random() < 0.5 ? 1 : -1, spd: 0.35 + Math.random() * 0.7 });
+      }
+
+      const logo = new Image();
+      let logoReady = false;
+      logo.onload = () => { logoReady = true; };
+      logo.src = 'images/mm_indent.png';
+
+      let W = 0, H = 0, cx = 0, cy = 0, sx = 1, sy = 1;
+      const FRAME_MS = 1000 / 30;
+      const DPR_CAP = 1.5;
+
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+        const cssW = canvas.offsetWidth, cssH = canvas.offsetHeight;
+        canvas.width = Math.max(1, cssW * dpr);
+        canvas.height = Math.max(1, cssH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        W = cssW; H = cssH; cx = W / 2; cy = H / 2;
+        sx = W * 0.346;
+        sy = Math.min(H * 0.260, W * 0.122);
+        updateGround();
+      }
+      function SXp(mx) { return cx + mx * sx; }
+      function SYp(my) { return cy + my * sy; }
+
+      let groundY = 0;
+      const OBS_OFFSET = 34, ACT_OFFSET = 14;
+      const GROUND_FRAC = 0.60;
+      const REF_OVERHANG = 0.13;
+      const TRAY_RISE = 34;
+      function updateGround() {
+        groundY = H * GROUND_FRAC;
+        cy = groundY;
+        const dispH = refineryLayer.getBoundingClientRect().height || H * 0.35;
+        refineryLayer.style.top = (groundY + dispH * REF_OVERHANG - dispH) + 'px';
+        refineryLayer.style.transform = 'translateX(-50%)';
+        groundLine.style.top = groundY + 'px';
+        groundGrad.style.top = groundY + 'px';
+        obsLabel.style.top = (groundY - OBS_OFFSET) + 'px';
+        actLabel.style.top = (groundY + ACT_OFFSET) + 'px';
+        trayLayer.style.top = (groundY - TRAY_RISE) + 'px';
+      }
+
+      let growth = 0, logoReveal = 0;
+
+      function heartbeat(t) {
+        const p = (t % 1.4) / 1.4;
+        const a = Math.exp(-Math.pow(p / 0.05, 2));
+        const b = 0.55 * Math.exp(-Math.pow((p - 0.18) / 0.06, 2));
+        return Math.min(1, a + b);
+      }
+
+      let running = false, started = false, onScreen = false, tabHidden = false;
+      let last = 0, lastFrame = 0;
+
+      function tick(now) {
+        if (!running) return;
+        requestAnimationFrame(tick);
+        if (now - lastFrame < FRAME_MS) return;
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now; lastFrame = now;
+        draw(now / 1000, dt);
+      }
+
+      function draw(t, dt) {
+        ctx.clearRect(0, 0, W, H);
+        const N2 = nodes.length;
+        const hb = heartbeat(t);
+
+        const vis = new Float32Array(N2), fx = new Float32Array(N2);
+        for (let i = 0; i < N2; i++) {
+          vis[i] = easeOut(smoothstep(nodes[i].birth, nodes[i].birth + 0.16, growth));
+          fx[i] = 1 - smoothstep(0.50, 0.95, Math.abs(nodes[i].mx));
+        }
+
+        ctx.lineWidth = 1;
+        for (let i = 0; i < edges.length; i++) {
+          const ea = edges[i].a, eb = edges[i].b;
+          const grow = Math.min(vis[ea], vis[eb]);
+          if (grow <= 0.01) continue;
+          const a = grow * Math.min(fx[ea], fx[eb]);
+          if (a <= 0.01) continue;
+          const A = nodes[ea], B = nodes[eb];
+          const ax = SXp(A.mx * vis[ea]), ay = SYp(A.my * vis[ea]);
+          const bx = SXp(B.mx * vis[eb]), by = SYp(B.my * vis[eb]);
+          const base = edges[i].spoke ? 0.20 : 0.10;
+          ctx.strokeStyle = 'rgba(255,255,255,' + ((base + 0.05 * hb) * a).toFixed(3) + ')';
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        }
+
+        for (let i = 0; i < N2; i++) {
+          const e = vis[i];
+          if (e <= 0.01 || fx[i] <= 0.01) continue;
+          const x = SXp(nodes[i].mx * e), y = SYp(nodes[i].my * e);
+          const tw = 0.6 + 0.4 * Math.sin(t * (0.6 + hsh(i) * 1.2) + hsh(i + 2) * 6.28);
+          const a = (0.6 * tw + 0.18 * hb) * e * fx[i];
+          ctx.fillStyle = 'rgba(255,255,255,' + a.toFixed(3) + ')';
+          ctx.beginPath(); ctx.arc(x, y, nodes[i].size, 0, Math.PI * 2); ctx.fill();
+        }
+
+        for (let i = 0; i < NPULSE; i++) {
+          const p = pulses[i];
+          p.t += p.dir * p.spd * dt;
+          if (p.t < 0 || p.t > 1) {
+            p.e = Math.floor(Math.random() * edges.length);
+            p.t = Math.random() < 0.5 ? 0 : 1;
+            p.dir = p.t === 0 ? 1 : -1;
+            p.spd = 0.35 + Math.random() * 0.7;
+          }
+          const ed = edges[p.e], A = nodes[ed.a], B = nodes[ed.b];
+          const grow = Math.min(vis[ed.a], vis[ed.b]);
+          const fade = Math.min(fx[ed.a], fx[ed.b]);
+          const e = grow * fade;
+          if (e <= 0.05) continue;
+          const mx = A.mx + (B.mx - A.mx) * p.t;
+          const my = A.my + (B.my - A.my) * p.t;
+          const x = SXp(mx * grow), y = SYp(my * grow);
+          ctx.fillStyle = 'rgba(255,255,255,' + (0.28 * e).toFixed(3) + ')';
+          ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,' + (0.95 * e).toFixed(3) + ')';
+          ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI * 2); ctx.fill();
+        }
+
+        if (logoReady && logoReveal > 0.01) {
+          // Preserve the mark's native aspect (455×442) so it isn't stretched,
+          // and centre it exactly on (cx, cy) — the ground line / node heart.
+          const lw = Math.min(W, H) * 0.072 * (1 + 0.03 * hb);
+          const lh = lw * (442 / 455);
+          ctx.globalAlpha = logoReveal * (0.82 + 0.18 * hb);
+          ctx.drawImage(logo, cx - lw / 2, cy - lh / 2, lw, lh);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      /* ---- Boot readout + auto reveal choreography.
+         Scroll drives the refinery fade (during the pre-lock rise) and the
+         ontology growth (during the pinned scroll). Once the ontology reveal
+         completes, the rest plays automatically — no further scroll needed:
+           1. the tray wipes fully open,
+           2. then the flow words appear one at a time, each revealed
+              letter-by-letter (glitch style like the deep-tech caption) —
+              "Industrial world ›" holds 1.2s, the rest 0.7s each — ending on
+              and holding "Transformed ›",
+           3. then, after a short beat, the benefits roll in one by one
+              (1s each), looping.
+         Scrolling back up resets it so scrolling down replays from the start. */
+      const flowSlot = document.querySelector('.boot-flow');
+      const beneSlot = document.querySelector('.boot-benefit');
+      const BOOT_FLOW = ['Industrial world ›', 'Sensed ›', 'Understood ›', 'Decided ›', 'Optimised ›', 'Transformed ›'];
+      // Index 0 is the "Efficiencies unlocked" intro; 1..9 are the nine benefits
+      // that loop. Stored sentence-case; CSS uppercases them.
+      const BOOT_BENE = ['Efficiencies unlocked', 'Energy intelligence', 'Yield maximisation', 'Fast failure', 'Anomaly mitigation', 'Throughput acceleration', 'Bottleneck elimination', 'Safety & carbon gains', 'Capex avoidance', 'Self optimising industrial operations'];
+      const FLOW_FIRST = 1200;    // "Industrial world ›" holds a touch longer
+      const FLOW_STEP  = 700;     // each subsequent flow word
+      const LETTER_STAGGER = 28;  // per-letter reveal stagger
+      const BENE_DELAY = 550;     // beat after "Transformed ›" before benefits begin
+      const BENE_STEP  = 1000;    // benefit dwell
+      const BENE_ANIM  = 440;     // benefit roll (in/out) duration
+      const TRAY_REVEAL_MS = 2000;   // doubled, with an ease-out for a premium feel
+
+      let autoOn = false, trayAnim = null, obsAnim = null, actAnim = null, flowTimer = null, beneTimer = null, beneIdx = 0;
+      const benePrev = { el: null };
+
+      // Flow word — revealed letter by letter (glitch style, white).
+      function showFlowWord(text) {
+        if (!flowSlot) return;
+        flowSlot.textContent = '';
+        const word = document.createElement('span');
+        word.className = 'boot-word';
+        let i = 0;
+        for (const ch of text) {
+          const l = document.createElement('span');
+          l.className = 'flow-letter';
+          l.textContent = ch;
+          l.style.animationDelay = (i * LETTER_STAGGER) + 'ms';
+          word.appendChild(l);
+          i++;
+        }
+        flowSlot.appendChild(word);
+      }
+
+      // Benefit — vertical roll (departure-board / odometer): the new statement
+      // rolls down from above into place while the previous rolls down and out.
+      function showBenefit(text) {
+        if (!beneSlot) return;
+        const span = document.createElement('span');
+        span.className = 'boot-word';
+        span.textContent = text;
+        beneSlot.appendChild(span);
+        const prev = benePrev.el;
+        span.animate(
+          [ { transform: 'translateY(-50%) translateY(-115%)', opacity: 0 },
+            { transform: 'translateY(-50%) translateY(0%)',    opacity: 1 } ],
+          { duration: BENE_ANIM, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+        if (prev) {
+          prev.animate(
+            [ { transform: 'translateY(-50%) translateY(0%)',   opacity: 1 },
+              { transform: 'translateY(-50%) translateY(115%)', opacity: 0 } ],
+            { duration: BENE_ANIM, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' }
+          ).onfinish = () => prev.remove();
+        }
+        benePrev.el = span;
+      }
+
+      function startBenefits() {
+        if (beneTimer) return;
+        beneIdx = 0;
+        showBenefit(BOOT_BENE[0]);   // ›Efficiencies unlocked
+        beneTimer = setInterval(function () {
+          if (tabHidden || !onScreen) return;
+          beneIdx = (beneIdx >= BOOT_BENE.length - 1) ? 1 : beneIdx + 1;   // loop the nine (1..9)
+          showBenefit(BOOT_BENE[beneIdx]);
+        }, BENE_STEP);
+      }
+
+      function startFlow() {
+        if (flowTimer || !flowSlot) return;
+        let i = 0;
+        showFlowWord(BOOT_FLOW[0]);
+        function nextFlow() {
+          i++;
+          showFlowWord(BOOT_FLOW[i]);
+          if (i >= BOOT_FLOW.length - 1) {   // "Transformed ›" shown → holds; short beat, then benefits begin
+            flowTimer = setTimeout(startBenefits, BENE_DELAY);
+            return;
+          }
+          flowTimer = setTimeout(nextFlow, FLOW_STEP);
+        }
+        flowTimer = setTimeout(nextFlow, FLOW_FIRST);
+      }
+
+      // Auto reveal: tray wipes fully open, then the flow text starts.
+      const LABEL_EASE = 'cubic-bezier(.16,.84,.3,1)';   // ease-out — premium feel
+      function autoStart() {
+        if (autoOn || reduced) return;
+        autoOn = true;
+        if (outro) outro.style.opacity = '1';
+        // OBSERVATION elevates up / ACTION lowers down, both from the ground line.
+        if (obsLabel) obsAnim = obsLabel.animate(
+          [ { opacity: 0, transform: 'translateY(' + OBS_OFFSET + 'px)' },
+            { opacity: 1, transform: 'translateY(0px)' } ],
+          { duration: 700, easing: LABEL_EASE, fill: 'forwards' });
+        if (actLabel) actAnim = actLabel.animate(
+          [ { opacity: 0, transform: 'translateY(' + (-ACT_OFFSET) + 'px)' },
+            { opacity: 1, transform: 'translateY(0px)' } ],
+          { duration: 700, easing: LABEL_EASE, fill: 'forwards' });
+        // Tray wipes fully open — doubled duration with an ease-out at the end.
+        trayAnim = trayLayer.animate(
+          [ { clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0% 0)' } ],
+          { duration: TRAY_REVEAL_MS, easing: LABEL_EASE, fill: 'forwards' });
+        trayAnim.onfinish = () => { trayLayer.style.clipPath = 'inset(0 0 0% 0)'; };
+        // Flow words reveal + cycle as soon as the tray STARTS revealing.
+        startFlow();
+      }
+
+      function autoReset() {
+        if (!autoOn) return;
+        autoOn = false;
+        if (trayAnim) { trayAnim.cancel(); trayAnim = null; }
+        if (obsAnim) { obsAnim.cancel(); obsAnim = null; }
+        if (actAnim) { actAnim.cancel(); actAnim = null; }
+        if (flowTimer) { clearTimeout(flowTimer); flowTimer = null; }
+        if (beneTimer) { clearInterval(beneTimer); beneTimer = null; }
+        beneIdx = 0; benePrev.el = null;
+        trayLayer.style.clipPath = 'inset(0 0 100% 0)';
+        if (obsLabel) { obsLabel.style.opacity = '0'; obsLabel.style.transform = 'translateY(' + OBS_OFFSET + 'px)'; }
+        if (actLabel) { actLabel.style.opacity = '0'; actLabel.style.transform = 'translateY(' + (-ACT_OFFSET) + 'px)'; }
+        if (flowSlot) flowSlot.textContent = '';
+        if (beneSlot) beneSlot.textContent = '';
+        if (outro) outro.style.opacity = '0';
+      }
+
+      let scrollTicking = false;
+      function onScrollUpdate() {
+        const rect = scrollSpace.getBoundingClientRect();
+        const vh = window.innerHeight || 1;
+        const pinScroll = Math.max(1, rect.height - vh);
+        // rise: 0 when the section top is at the viewport bottom, 1 when it locks
+        const rise = Math.max(0, Math.min(1, (vh - rect.top) / vh));
+        // pin: 0 at lock, 1 at the end of the pinned scroll
+        const pin  = Math.max(0, Math.min(1, -rect.top / pinScroll));
+
+        // Header reveal — fades in and moves up as the section rises in, then
+        // holds in place (no further drift during the pinned scroll).
+        if (installHeading && !reduced) {
+          const enterY = (1 - ramp(rise, 0.12, 0.9)) * 46;   // enters from +46px → 0
+          installHeading.style.opacity = ramp(rise, 0.12, 0.7).toFixed(3);
+          installHeading.style.transform = 'translateX(-50%) translateY(' + enterY.toFixed(1) + 'px)';
+        }
+
+        // Refinery fades in during the rise — before the header locks.
+        refineryLayer.style.opacity = ramp(rise, 0.35, 1.0).toFixed(3);
+
+        // Ontology network + ground line reveal during the pinned scroll.
+        canvas.style.opacity = ramp(pin, 0.00, 0.08).toFixed(3);
+        logoReveal           = ramp(pin, 0.02, 0.14);
+        growth               = ramp(pin, 0.05, 0.42);
+
+        const lineReveal = ramp(pin, 0.20, 0.44);
+        groundLine.style.transform = 'scaleX(' + lineReveal.toFixed(4) + ')';
+        groundGrad.style.opacity = ramp(pin, 0.24, 0.46).toFixed(3);
+
+        // Once the nodes are fully grown AND the ground line has extended fully
+        // across the screen, auto-play the rest (labels → tray → flow → benefits).
+        // Labels + tray are no longer scroll-driven; they run in autoStart().
+        if (pin >= 0.48) autoStart(); else if (pin < 0.42) autoReset();
+
+        scrollTicking = false;
+      }
+      function onScroll() { if (!scrollTicking) { requestAnimationFrame(onScrollUpdate); scrollTicking = true; } }
+
+      function maybeRun() {
+        if (!started || tabHidden || !onScreen || reduced) { running = false; return; }
+        if (!running) { running = true; last = performance.now(); lastFrame = 0; requestAnimationFrame(tick); }
+      }
+
+      resize();
+      if (refineryImg.complete && refineryImg.naturalHeight) { updateGround(); onScrollUpdate(); }
+      refineryImg.addEventListener('load', () => { updateGround(); onScrollUpdate(); });
+      window.addEventListener('resize', () => { resize(); onScrollUpdate(); });
+      window.addEventListener('scroll', onScroll, { passive: true });
+      document.addEventListener('visibilitychange', () => { tabHidden = document.hidden; maybeRun(); });
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(e => { onScreen = e.isIntersecting; maybeRun(); });
+        }, { threshold: 0.02 });
         io.observe(canvas);
+      } else { onScreen = true; }
+
+      started = true;
+      onScrollUpdate();
+      if (reduced) { growth = 1; logoReveal = 1; canvas.style.opacity = '1'; refineryLayer.style.opacity = '1'; trayLayer.style.clipPath = 'inset(0 0 0 0)'; groundLine.style.transform = 'scaleX(1)'; groundGrad.style.opacity = '1'; obsLabel.style.opacity = '1'; actLabel.style.opacity = '1'; obsLabel.style.transform = 'none'; actLabel.style.transform = 'none'; if (installHeading) { installHeading.style.opacity = '1'; installHeading.style.transform = 'translateX(-50%)'; } if (outro) outro.style.opacity = '1'; if (flowSlot) flowSlot.innerHTML = '<span class="boot-word">Transformed ›</span>'; if (beneSlot) beneSlot.innerHTML = '<span class="boot-word">Efficiencies unlocked</span>'; draw(0, 0); }
+      else maybeRun();
+    })();
+
+    // Scroll-linked hero → feature reel transition (V2). Writes a single
+    // --page-scroll-progress (0 → 1) CSS variable on :root; CSS rules on
+    // .hero and .feature-reel derive scale, opacity, and darken from it.
+    //   progress = 0 when the feature reel's top edge is at the viewport
+    //              bottom (reel still below view); hero is at rest.
+    //   progress = 1 when the feature reel's top edge is at the viewport
+    //              top (hero fully receded + faded; reel fully in view).
+    // Reversible — scrolling back up walks progress back to 0.
+    (function () {
+      const reel = document.querySelector('.feature-reel');
+      if (!reel) return;
+      const root = document.documentElement;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) return;
+
+      let ticking = false;
+      function update() {
+        const vh = window.innerHeight || 1;
+        const reelTop = reel.getBoundingClientRect().top;
+        // 0 when reelTop ≥ vh (reel below viewport); 1 when reelTop ≤ 0 (reel
+        // top at or above viewport top). Linear in between.
+        const p = Math.max(0, Math.min(1, 1 - reelTop / vh));
+        root.style.setProperty('--page-scroll-progress', p.toFixed(4));
+        ticking = false;
+      }
+      function onScroll() {
+        if (!ticking) {
+          requestAnimationFrame(update);
+          ticking = true;
+        }
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+      update();
+    })();
+
+    // Feature reel — tap-to-play. preload="none" on the <video> means zero
+    // bytes are fetched until startPlayback() is called. On first tap we
+    // attach native controls (play/pause/scrub/volume) so the user has full
+    // UI, then play(). On 'ended' we restore the custom button so they can
+    // replay. If the browser blocks play() (rare, e.g. some low-power modes),
+    // we revert the UI so the user can retry.
+    (function () {
+      const video = document.getElementById('featureReel');
+      const btn   = document.getElementById('featureReelPlay');
+      const frame = btn ? btn.closest('.feature-reel-frame') : null;
+      if (!video || !btn || !frame) return;
+
+      function startPlayback() {
+        video.setAttribute('controls', '');
+        frame.classList.add('is-playing');
+        const p = video.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {
+            // Play blocked — restore the button so the user can retry
+            video.removeAttribute('controls');
+            frame.classList.remove('is-playing');
+          });
+        }
+      }
+      btn.addEventListener('click', startPlayback);
+
+      video.addEventListener('ended', () => {
+        video.removeAttribute('controls');
+        frame.classList.remove('is-playing');
+        // Reset the element so the poster image shows again (not a black/last frame).
+        video.load();
+      });
+    })();
+
+    // Turbine emission (Connected Understanding section). Flat 2D: turbine.png
+    // rotates clockwise while telemetry text + comet trails radiate from it.
+    // Triggers on scroll into view, rotation eases in then holds; pauses when
+    // off-screen. Fully scoped so its many locals don't collide with the page.
+    (function () {
+      const canvas = document.getElementById('turbineCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');            // emission lines + text (in front of the curve)
+      const section = canvas.closest('.section-ci');
+      const turbineStill = section ? section.querySelector('.turbine-still') : null;  // turbine image (behind the curve)
+      const ciMark = section ? section.querySelector('.ci-mark') : null;              // white MM mark (centre "heart")
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const DATA = [
+        { t:'Site & Ambient', subs:[
+          {t:'Ambient environment', leaves:['Ambient temperature','Humidity','Barometric pressure','Wind conditions']},
+          {t:'Package / enclosure', leaves:['Enclosure temperature','Ventilation status','Icing risk']},
+        ]},
+        { t:'Air Intake & Compressor', subs:[
+          {t:'Intake filtration', leaves:['Filter differential pressure','Pulse-cleaning status']},
+          {t:'Variable geometry', leaves:['Inlet guide vane position','Actuator feedback']},
+          {t:'Compressor operation', leaves:['Discharge pressure','Pressure ratio','Corrected airflow']},
+          {t:'Compressor health', leaves:['Surge margin estimate','Fouling index']},
+        ]},
+        { t:'Fuel Systems', subs:[
+          {t:'Fuel gas supply', leaves:['Gas pressure','Gas flow','Wobbe index','Moisture content']},
+          {t:'Gas fuel valves', leaves:['Stop valve position','Control valve position']},
+          {t:'Liquid fuel', leaves:['Fuel oil pressure','Fuel viscosity']},
+        ]},
+        { t:'Combustion', subs:[
+          {t:'Flame monitoring', leaves:['Flame intensity','Loss-of-flame detection']},
+          {t:'Combustion dynamics', leaves:['Dynamic pressure','Pulsation amplitude','Screech detection']},
+          {t:'Combustor health', leaves:['Liner temperature','Flashback detection']},
+        ]},
+        { t:'Hot Gas Path & Exhaust', subs:[
+          {t:'Turbine thermal', leaves:['Firing temperature','Exhaust gas temperature','Temperature spread']},
+          {t:'Hot gas path health', leaves:['Creep life consumption','TBC degradation']},
+          {t:'Exhaust system', leaves:['Exhaust backpressure','Stack temperature']},
+        ]},
+        { t:'Rotor & Mechanical', subs:[
+          {t:'Shaft speed / position', leaves:['Shaft speed','Overspeed detection','Axial displacement']},
+          {t:'Vibration monitoring', leaves:['Bearing vibration','Blade-pass vibration','Broadband vibration']},
+          {t:'Bearing condition', leaves:['Bearing metal temperature','Thrust bearing position']},
+        ]},
+        { t:'Lube / Cooling', subs:[
+          {t:'Lubrication system', leaves:['Lube oil pressure','Oil cooler temperature']},
+          {t:'Oil quality', leaves:['Water in oil','Particle count','Remaining oil life']},
+          {t:'Cooling / seal air', leaves:['Cooling air flow','Seal differential pressure']},
+        ]},
+        { t:'Generator & Electrical', subs:[
+          {t:'Generator output', leaves:['Active power (MW)','Reactive power (MVAr)','Power factor']},
+          {t:'Generator thermal', leaves:['Stator winding temperature','Rotor temperature']},
+          {t:'Excitation and AVR', leaves:['Field voltage','AVR status']},
+        ]},
+        { t:'Controls / Safety', subs:[
+          {t:'Control loops', leaves:['Speed control','Load control','Emissions control']},
+          {t:'Trips and protection', leaves:['Overspeed trip','High vibration trip','Emergency stop']},
+          {t:'Fire and gas safety', leaves:['Combustible gas detection','Flame detection']},
+        ]},
+        { t:'Performance / Emissions', subs:[
+          {t:'Performance monitoring', leaves:['Heat rate','Thermal efficiency','Corrected output']},
+          {t:'Emissions monitoring', leaves:['NOx','CO','CO2','Ammonia slip']},
+          {t:'Analytics health', leaves:['Sensor validity','Anomaly detection score']},
+        ]},
+      ];
+      const NC = DATA.length;
+      const POOLS = DATA.map(cat => {
+        const pool = [{ text: cat.t, w: 1.6 }];
+        cat.subs.forEach(s => {
+          pool.push({ text: s.t, w: 1.15 });
+          s.leaves.forEach(l => pool.push({ text: l, w: 0.85 }));
+        });
+        return pool;
+      });
+
+      let W = 0, H = 0, cx = 0, cy = 0;
+      const FRAME_MS = 1000 / 30, DPR_CAP = 1.5;
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+        const cssW = canvas.offsetWidth, cssH = canvas.offsetHeight;
+        canvas.width = Math.max(1, cssW * dpr);
+        canvas.height = Math.max(1, cssH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        W = cssW; H = cssH; cx = W / 2; cy = H / 2;
+      }
+
+      const K = 4;
+      const M = Math.round(NC * K * 1.1);
+      const slots = [];
+      function turbineRadius() { return Math.min(W, H) * 0.28; }
+      function Rin()  { return turbineRadius() * 0.55; }
+      function Rout() { return Math.hypot(W, H) * 0.31; }
+      function respawn(i) {
+        const s = slots[i], pool = POOLS[s.cat];
+        s.ptr = (s.ptr + 1) % pool.length;
+        const word = pool[s.ptr];
+        s.text = word.text; s.weight = word.w;
+        const sector = (Math.PI * 2) / NC, base = s.cat * sector;
+        s.angle = base + (Math.random() - 0.5) * sector * 0.9;
+        s.L = 6.5 + Math.random() * 4; s.age = 0;
+      }
+      for (let i = 0; i < M; i++) {
+        slots.push({ cat: i % NC, ptr: Math.floor(Math.random() * 1000), angle: 0, text: '', weight: 1,
+          L: 6.5 + Math.random() * 4, age: 0, freq: 0.35 + Math.random() * 0.8, phase: Math.random() * 6.283 });
+        respawn(i);
+        slots[i].age = Math.random() * slots[i].L;
+      }
+
+      let rotation = 0, turbineRotation = 0, omega = 0;
+      const OMEGA_STEADY = 0.08, EASE_IN_SECS = 2.2;
+      const INTRO_SECS = 1.1, INTRO_DELAY = 0.7;   // turbine z-approach, then emission
+      let playElapsed = 0, emitOpacity = 0;
+      let running = false, started = false, onScreen = false, tabHidden = false;
+      let last = 0, lastFrame = 0;
+
+      function tick(now) {
+        if (!running) return;
+        requestAnimationFrame(tick);
+        if (now - lastFrame < FRAME_MS) return;
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now; lastFrame = now;
+        playElapsed += dt;
+        const e = Math.min(1, playElapsed / EASE_IN_SECS);
+        const eased = e * e * (3 - 2 * e);
+        omega = OMEGA_STEADY * eased;
+        rotation += omega * dt;
+        turbineRotation += omega * 4 * dt;
+        // turbine image (DOM element behind the curve): rotate + z-approach intro
+        if (turbineStill) {
+          const introE = Math.min(1, playElapsed / INTRO_SECS);
+          const introEased = introE * introE * (3 - 2 * introE);
+          turbineStill.style.transform = 'rotate(' + turbineRotation + 'rad) scale(' + (0.55 + 0.45 * introEased) + ')';
+          turbineStill.style.opacity = introEased.toFixed(3);
+          // centre mark fades in with the turbine (transform is owned by its heartbeat animation)
+          if (ciMark) ciMark.style.opacity = introEased.toFixed(3);
+        }
+        // emission (lines + text) fades in only after the turbine has approached
+        if (playElapsed > INTRO_DELAY) emitOpacity = Math.min(1, emitOpacity + dt / 1.6);
+        draw(now / 1000);
+      }
+
+      function draw(t) {
+        ctx.clearRect(0, 0, W, H);
+        // emission lines + text (canvas sits in front of the curved line)
+        const rin = Rin(), rout = Rout();
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = "7px 'Share Tech Mono', monospace";
+        for (let i = 0; i < M; i++) {
+          const s = slots[i];
+          s.age += (1 / 30);
+          if (s.age >= s.L) { respawn(i); continue; }
+          const u = s.age / s.L, ang = s.angle + rotation, r = rin + (rout - rin) * u;
+          const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r;
+          let a;
+          if (u < 0.14) a = u / 0.14;
+          else if (u > 0.32) a = Math.max(0, 1 - (u - 0.32) / 0.30);
+          else a = 1;
+          const flick = 0.62 + 0.38 * Math.sin(t * s.freq + s.phase);
+          const alpha = Math.max(0, a * flick) * emitOpacity;
+          if (alpha <= 0.01) continue;
+          const r2 = Math.max(rin * 0.4, r - (rout - rin) * 0.16);
+          const gx = cx + Math.cos(ang) * r2, gy = cy + Math.sin(ang) * r2;
+          const grad = ctx.createLinearGradient(x, y, gx, gy);
+          grad.addColorStop(0, `rgba(255,255,255,${(alpha * 0.7).toFixed(3)})`);
+          grad.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.strokeStyle = grad; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gx, gy); ctx.stroke();
+          ctx.fillStyle = `rgba(255,255,255,${(alpha * 0.9).toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
+          let textA;
+          if (u < 0.12) textA = u / 0.12;
+          else textA = Math.max(0, 1 - (u - 0.12) / 0.33);
+          textA *= flick * emitOpacity;
+          if (textA > 0.01) {
+            ctx.fillStyle = `rgba(255,255,255,${textA.toFixed(3)})`;
+            ctx.fillText(s.text, x, y - 9);
+          }
+        }
+      }
+
+      function maybeRun() {
+        if (!started || tabHidden || !onScreen || reduced) { running = false; return; }
+        if (!running) { running = true; last = performance.now(); lastFrame = 0; requestAnimationFrame(tick); }
+      }
+      resize();
+      window.addEventListener('resize', resize);
+      document.addEventListener('visibilitychange', () => { tabHidden = document.hidden; maybeRun(); });
+      // Turbine playback: fires once the turbine reaches the central 40% band
+      // of the viewport, so it doesn't run while merely approaching.
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(e => { onScreen = e.isIntersecting; maybeRun(); });
+        }, { threshold: 0, rootMargin: '-30% 0px -30% 0px' });
+        io.observe(canvas);
+      } else { onScreen = true; }
+
+      // Text rise-in: a SEPARATE, later trigger keyed to the small text block
+      // (not the large canvas), so the header + body hold off until the text
+      // itself reaches the central 20% of the viewport — well after the big
+      // turbine canvas would first peek in.
+      const ciText = section ? section.querySelector('.ci-text') : null;
+      if (ciText) {
+        if ('IntersectionObserver' in window && !reduced) {
+          const tio = new IntersectionObserver((entries) => {
+            entries.forEach(e => { if (e.isIntersecting) { ciText.classList.add('rise-in'); tio.disconnect(); } });
+          }, { threshold: 0, rootMargin: '-40% 0px -40% 0px' });
+          tio.observe(ciText);
+        } else { ciText.classList.add('rise-in'); }
       }
 
       started = true;
-      requestAnimationFrame(tick);
+      if (reduced) {
+        if (turbineStill) { turbineStill.style.opacity = '1'; turbineStill.style.transform = 'none'; }
+        if (ciMark) ciMark.style.opacity = '1';
+        draw(0);
+      } else maybeRun();
     })();
 
     // Sections B / C / D — generic fade-up reveal on scroll. Any element with
@@ -2366,28 +3102,6 @@
         });
       }, { threshold: 0.2 });
       items.forEach(el => observer.observe(el));
-    })();
-
-    // Section D — dedicated observer that adds .labels-spread to the divider
-    // ONLY when the band is fully in view (threshold 1.0). This delays the
-    // OBSERVATION/ACTION label spread animation until the band has finished
-    // entering the viewport, so the user sees the divider settle first.
-    (function () {
-      const stage = document.querySelector('.divider-stage');
-      if (!stage) return;
-      if (!('IntersectionObserver' in window)) {
-        stage.classList.add('labels-spread');
-        return;
-      }
-      const io = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            stage.classList.add('labels-spread');
-            io.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 1.0 });
-      io.observe(stage);
     })();
 
     // Section B+C — dedicated observer that adds .in-view to .caption-block
@@ -2436,6 +3150,127 @@
       io.observe(wrap);
     })();
 
+    // Section 6 — bloom reveal coordinator. On scroll-in: the base scene
+    // (trust_bloom.webp, the .phil-bloom bg) is already showing; then the bloom
+    // orb (bloom.webp) scales 20%→100% and fades in with an ease-out. The moment
+    // the orb reaches 80% scale, the particle burst is released and the text
+    // reveals — all together. Skipped/static under prefers-reduced-motion.
+    (function () {
+      const canvas = document.querySelector('.phil-particles');
+      const orb = document.querySelector('.phil-bloom-orb');
+      const bloom = document.querySelector('.phil-bloom');
+      const philContent = document.querySelector('.phil-content');
+      if (!canvas || !bloom) return;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function revealText() {
+        if (philContent) philContent.classList.add('phil-in');
+        if (typeof window.__revealPhilSub === 'function') window.__revealPhilSub();
+      }
+      if (reduced) { revealText(); return; }   // CSS shows the orb + content statically
+
+      const ctx = canvas.getContext('2d');
+      const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+      const FRAME_MS = 1000 / 30;
+      const MAX = 220;
+      const COLORS = [ [255, 255, 255], [244, 248, 255] ];
+      let W = 0, H = 0, cx = 0, cy = 0;
+      const parts = [];
+
+      function resize() {
+        const r = canvas.getBoundingClientRect();
+        W = r.width; H = r.height;
+        canvas.width = Math.max(1, Math.round(W * DPR));
+        canvas.height = Math.max(1, Math.round(H * DPR));
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        cx = W * 0.5; cy = H * 0.48;                 // bloom centre within the band
+      }
+      function spawn() {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 21 + Math.random() * 24;
+        const col = COLORS[(Math.random() * COLORS.length) | 0];
+        parts.push({
+          x: cx + Math.cos(ang) * 3, y: cy + Math.sin(ang) * 3,
+          vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+          life: 1, decay: 0.25 + Math.random() * 0.11,
+          size: 0.3 + Math.random() * 0.6, col
+        });
+      }
+
+      let running = false, onScreen = false, hidden = false, released = false, last = 0, lastFrame = 0;
+      function maybe() {
+        if (onScreen && !hidden && released) {
+          if (!running) { running = true; last = performance.now(); lastFrame = 0; requestAnimationFrame(tick); }
+        } else { running = false; }
+      }
+      function tick(now) {
+        if (!running) return;
+        requestAnimationFrame(tick);
+        if (now - lastFrame < FRAME_MS) return;
+        const dt = Math.min((now - last) / 1000, 0.05);
+        last = now; lastFrame = now;
+
+        for (let i = 0; i < 2 && parts.length < MAX; i++) spawn();
+
+        const py = parseFloat(bloom.style.getPropertyValue('--parallax-y')) || 0;
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.setTransform(DPR, 0, 0, DPR, 0, py * DPR);
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = parts.length - 1; i >= 0; i--) {
+          const p = parts[i];
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          p.life -= p.decay * dt;
+          if (p.life <= 0) { parts.splice(i, 1); continue; }
+          const a = p.life * (2 - p.life);
+          const rgb = p.col[0] + ',' + p.col[1] + ',' + p.col[2] + ',';
+          ctx.fillStyle = 'rgba(' + rgb + (a * 0.26).toFixed(3) + ')';
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2.6, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(' + rgb + a.toFixed(3) + ')';
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
+      // Orb bloom: scale 0.2→1.0 + opacity 0→1 (ease-out). Release particles +
+      // reveal text as soon as the orb reaches 80% scale.
+      let seqStarted = false;
+      function startSequence() {
+        if (seqStarted) return;
+        seqStarted = true;
+        if (!orb) { released = true; revealText(); maybe(); return; }
+        const D = 2400, t0 = performance.now();       // slower, smoother bloom
+        let fired = false;
+        const ease = (x) => 1 - Math.pow(1 - x, 3);   // ease-out cubic
+        (function orbFrame(now) {
+          const p = Math.min(1, (now - t0) / D);
+          const e = ease(p);
+          const s = 0.2 + 0.8 * e;
+          const rot = -10 * (1 - e);                  // -10° → 0°: subtle clockwise turn as it grows
+          orb.style.transform = 'translate(-50%, -50%) rotate(' + rot.toFixed(2) + 'deg) scale(' + s.toFixed(3) + ')';
+          orb.style.opacity = e.toFixed(3);
+          if (!fired && s >= 0.8) { fired = true; released = true; revealText(); maybe(); }
+          if (p < 1) requestAnimationFrame(orbFrame);
+        })(t0);
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver((es) => {
+          es.forEach(e => { onScreen = e.isIntersecting; maybe(); });
+        }, { threshold: 0.05 }).observe(canvas);
+        // Delayed trigger — the bottom inset shrinks the root to the top 40% of
+        // the viewport, so the sequence only fires once the bloom has scrolled
+        // right up near the top (well into the section).
+        const io2 = new IntersectionObserver((es) => {
+          es.forEach(e => { if (e.isIntersecting) { startSequence(); io2.disconnect(); } });
+        }, { threshold: 0, rootMargin: '0px 0px -60% 0px' });
+        io2.observe(bloom);
+      } else { onScreen = true; startSequence(); }
+      document.addEventListener('visibilitychange', () => { hidden = document.hidden; maybe(); });
+    })();
+
     // Generic background-parallax controller — any element with a
     // `data-parallax="<strength>"` attribute drifts its background-image
     // vertically as the element passes through the viewport. Effect is
@@ -2443,8 +3278,8 @@
     // CSS feeds into its `background-position` calc().
     //
     // Desktop only (≥1024px). On mobile the hero bloom position is finely
-    // calibrated (32% rule) and the deeptech crop is content-driven; both
-    // would be disrupted by parallax. Skipped under prefers-reduced-motion.
+    // calibrated (32% rule) and the philosophy bloom crop is content-driven;
+    // both would be disrupted by parallax. Skipped under prefers-reduced-motion.
     (function () {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       if (!window.matchMedia('(min-width: 1024px)').matches) return;
@@ -2489,179 +3324,6 @@
       // Set initial positions on load so the hero doesn't snap on first scroll.
       update();
     })();
-
-    // ===== BEGIN: divider particle effect (JS) ====================
-    // Section D — horizontal particle drift across the band, with a slow
-    // brightness pulse traveling left→right along the horizon line. Echoes
-    // the OBSERVATION → ACTION narrative. Same motion vocabulary as the hero
-    // (additive blending, halo+core 2-pass draw, 30fps cap, IO pause,
-    // prefers-reduced-motion guard). To disable, delete this entire block,
-    // the matching CSS block, and the matching <canvas> in the HTML.
-    (function () {
-      const canvas = document.getElementById('dividerParticles');
-      if (!canvas) return;
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduced) return;
-
-      const ctx = canvas.getContext('2d');
-      const stage = canvas.parentElement;       // .divider-stage
-      const DPR = Math.min(window.devicePixelRatio || 1, 1.25);
-      const FRAME_MS = 1000 / 24;               // ambient effect — 24fps is plenty
-      const MAX = 80;
-      const PULSE_DURATION_MS = 8000;           // one full L→R sweep
-
-      let W = 0, H = 0, centerY = 0;
-      const particles = [];
-
-      function resize() {
-        const rect = stage.getBoundingClientRect();
-        W = rect.width;
-        H = rect.height;
-        centerY = H * 0.5;
-        canvas.width = Math.round(W * DPR);
-        canvas.height = Math.round(H * DPR);
-        canvas.style.width = W + 'px';
-        canvas.style.height = H + 'px';
-        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      }
-
-      function spawn() {
-        // 80% drift left→right (with the OBSERVATION→ACTION flow), 20% reverse
-        // for visual complexity. Slight y jitter around the bright horizon.
-        const goingRight = Math.random() < 0.8;
-        const speed = 0.4 + Math.random() * 1.1;       // 0.4–1.5 px/frame at 30fps
-        const yJitter = (Math.random() - 0.5) * H * 0.36;
-        const life = 1.0;
-        return {
-          x: goingRight ? -10 : W + 10,
-          y: centerY + yJitter,
-          vx: goingRight ? speed : -speed,
-          size: 0.7 + Math.random() * 1.3,             // 0.7–2.0 px core
-          life,
-          // Cool blue-white tint, occasional warm fleck for variety.
-          color: Math.random() < 0.15
-            ? [255, 200, 178]                          // warm fleck
-            : [220, 232, 255],                         // cool default
-        };
-      }
-
-      // One-shot fill: place particles already distributed across the band so
-      // the band is populated the moment it scrolls into view (instead of
-      // taking ~1.5s to fill from the edges via spawn()).
-      function prepopulate() {
-        for (let i = 0; i < MAX; i++) {
-          const p = spawn();
-          p.x = Math.random() * W;          // random x already inside the band
-          particles.push(p);
-        }
-      }
-
-      function step() {
-        // Steady-state spawn — replenishes particles as they drift off-stage.
-        while (particles.length < MAX && Math.random() < 0.4) {
-          particles.push(spawn());
-        }
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          p.x += p.vx;
-          // Fade based on horizontal position — peak at centre, fade at edges.
-          const distFromCenter = Math.abs(p.x - W * 0.5) / (W * 0.5);
-          p.life = Math.max(0, 1 - distFromCenter);
-          // Recycle when off-stage.
-          if (p.x < -20 || p.x > W + 20) particles.splice(i, 1);
-        }
-      }
-
-      function drawPulse(now) {
-        const t = (now % PULSE_DURATION_MS) / PULSE_DURATION_MS;   // 0..1
-        const x = t * W;
-        // Tie radius to band HEIGHT (not width) so the gradient fades to zero
-        // before reaching the top/bottom edges — prevents the pulse from
-        // brightening those edges of the source image.
-        const radius = H * 0.45;
-        // Gentle fade at the very edges so the pulse doesn't pop in/out.
-        let alpha = 0.16;
-        if (t < 0.08) alpha *= t / 0.08;
-        else if (t > 0.92) alpha *= (1 - t) / 0.08;
-        const grad = ctx.createRadialGradient(x, centerY, 0, x, centerY, radius);
-        grad.addColorStop(0, 'rgba(220, 232, 255, ' + alpha + ')');
-        grad.addColorStop(1, 'rgba(220, 232, 255, 0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
-      }
-
-      function drawParticles() {
-        for (let i = 0; i < particles.length; i++) {
-          const p = particles[i];
-          const a = p.life * 0.85;
-          const rgb = p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',';
-          // Soft halo
-          ctx.fillStyle = 'rgba(' + rgb + (a * 0.28) + ')';
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
-          ctx.fill();
-          // Bright core
-          ctx.fillStyle = 'rgba(' + rgb + a + ')';
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      let running = false;
-      let last = 0;
-      function tick(now) {
-        if (!running) return;
-        if (now - last < FRAME_MS) {
-          requestAnimationFrame(tick);
-          return;
-        }
-        last = now;
-        ctx.clearRect(0, 0, W, H);
-        ctx.globalCompositeOperation = 'lighter';
-        drawPulse(now);
-        step();
-        drawParticles();
-        ctx.globalCompositeOperation = 'source-over';
-        requestAnimationFrame(tick);
-      }
-
-      resize();
-      window.addEventListener('resize', resize);
-
-      // Only run while the divider is visible — saves cycles when off-screen.
-      let populated = false;
-      if ('IntersectionObserver' in window) {
-        const io = new IntersectionObserver((entries) => {
-          entries.forEach(e => {
-            if (e.isIntersecting && !running) {
-              if (!populated) { prepopulate(); populated = true; }
-              running = true;
-              last = 0;
-              requestAnimationFrame(tick);
-            } else if (!e.isIntersecting) {
-              running = false;
-            }
-          });
-        }, { threshold: 0 });
-        io.observe(stage);
-      } else {
-        if (!populated) { prepopulate(); populated = true; }
-        running = true;
-        requestAnimationFrame(tick);
-      }
-
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          running = false;
-        } else if (!running) {
-          running = true;
-          last = 0;
-          requestAnimationFrame(tick);
-        }
-      });
-    })();
-    // ===== END: divider particle effect (JS) ======================
 
     // ===== BEGIN: bloom right-half pulse (JS) ====================
     // Section B/C — single static white glow at the centre of the bloom
@@ -2920,6 +3582,210 @@
       });
     })();
     // ===== END: bloom right-half pulse (JS) ======================
+  </script>
+
+  <!-- Ontology tray: glowing particles travelling down the rib streamlines (self-contained). -->
+  <script>
+/* MatterMind ontology tray ribs — accurate polylines derived from pathref.svg (17 paths, 60 pts each).
+   Normalised: y 0..1 = rib top..bottom (full height); x centred ~0.5, aspect-preserved. */
+window.RIB_PATHS=[[[0.3655,0.0033],[0.3637,0.0226],[0.3617,0.0419],[0.3594,0.0611],[0.3568,0.0804],[0.3541,0.0996],[0.3512,0.1187],[0.348,0.1379],[0.3446,0.157],[0.341,0.176],[0.3372,0.195],[0.3331,0.214],[0.3288,0.2329],[0.3241,0.2517],[0.3192,0.2705],[0.314,0.2892],[0.3085,0.3077],[0.3026,0.3262],[0.2963,0.3446],[0.2896,0.3627],[0.2823,0.3807],[0.2747,0.3986],[0.2664,0.4161],[0.2574,0.4333],[0.2477,0.4501],[0.2371,0.4663],[0.2258,0.4821],[0.2138,0.4973],[0.2012,0.512],[0.1879,0.5261],[0.1742,0.5399],[0.1601,0.5532],[0.1457,0.5662],[0.131,0.5788],[0.1162,0.5913],[0.1012,0.6036],[0.0862,0.6159],[0.0712,0.6283],[0.0564,0.6407],[0.0418,0.6535],[0.0275,0.6666],[0.0137,0.6802],[0.0004,0.6944],[-0.012,0.7093],[-0.0234,0.7249],[-0.0337,0.7413],[-0.0427,0.7585],[-0.0502,0.7764],[-0.0562,0.7948],[-0.0611,0.8136],[-0.0647,0.8326],[-0.0668,0.8519],[-0.0674,0.8713],[-0.0664,0.8907],[-0.0637,0.9098],[-0.0593,0.9287],[-0.0532,0.9471],[-0.0455,0.9649],[-0.036,0.9818],[-0.0246,0.9975]],[[0.3679,0.0035],[0.3662,0.0227],[0.3642,0.0419],[0.3619,0.061],[0.3595,0.0801],[0.3568,0.0993],[0.354,0.1183],[0.3509,0.1374],[0.3477,0.1564],[0.3442,0.1753],[0.3405,0.1943],[0.3366,0.2132],[0.3324,0.232],[0.328,0.2508],[0.3233,0.2695],[0.3183,0.2881],[0.313,0.3066],[0.3073,0.3251],[0.3013,0.3434],[0.2949,0.3616],[0.288,0.3796],[0.2807,0.3974],[0.2728,0.415],[0.2643,0.4324],[0.2551,0.4493],[0.245,0.4658],[0.2343,0.4818],[0.2228,0.4972],[0.2106,0.5122],[0.1978,0.5266],[0.1845,0.5406],[0.1707,0.5541],[0.1566,0.5672],[0.1421,0.58],[0.1275,0.5925],[0.1126,0.6048],[0.0978,0.6171],[0.0829,0.6294],[0.0682,0.6419],[0.0537,0.6546],[0.0395,0.6677],[0.0259,0.6813],[0.0128,0.6955],[0.0006,0.7104],[-0.0106,0.7261],[-0.0207,0.7426],[-0.0294,0.7598],[-0.0367,0.7776],[-0.0426,0.7959],[-0.0474,0.8146],[-0.0509,0.8336],[-0.0529,0.8528],[-0.0534,0.872],[-0.0524,0.8913],[-0.0496,0.9104],[-0.0453,0.9291],[-0.0392,0.9474],[-0.0315,0.9651],[-0.022,0.9819],[-0.0107,0.9975]],[[0.5854,0.0035],[0.5867,0.0227],[0.5883,0.0419],[0.5902,0.0611],[0.5923,0.0802],[0.5946,0.0994],[0.5972,0.1185],[0.5999,0.1375],[0.6029,0.1566],[0.6061,0.1756],[0.6095,0.1945],[0.6131,0.2135],[0.6171,0.2323],[0.6212,0.2511],[0.6257,0.2699],[0.6305,0.2885],[0.6357,0.3071],[0.6411,0.3256],[0.647,0.3439],[0.6533,0.3621],[0.6601,0.3802],[0.6673,0.398],[0.6752,0.4156],[0.6837,0.4329],[0.6929,0.4498],[0.703,0.4663],[0.7138,0.4822],[0.7253,0.4977],[0.7375,0.5126],[0.7503,0.527],[0.7636,0.5409],[0.7773,0.5544],[0.7915,0.5675],[0.8059,0.5803],[0.8206,0.5928],[0.8354,0.6051],[0.8502,0.6174],[0.8651,0.6297],[0.8798,0.6421],[0.8943,0.6548],[0.9084,0.6679],[0.9221,0.6815],[0.9351,0.6957],[0.9473,0.7106],[0.9585,0.7263],[0.9685,0.7428],[0.9772,0.76],[0.9844,0.7778],[0.9904,0.7961],[0.9951,0.8148],[0.9986,0.8337],[1.0006,0.8529],[1.0011,0.8722],[1.0001,0.8914],[0.9973,0.9105],[0.9929,0.9292],[0.9869,0.9475],[0.9791,0.9651],[0.9697,0.9819],[0.9584,0.9975]],[[0.4512,0.0026],[0.4515,0.0205],[0.4514,0.0384],[0.4512,0.0563],[0.4509,0.0742],[0.4504,0.0921],[0.4497,0.11],[0.4489,0.1279],[0.4479,0.1458],[0.4467,0.1637],[0.4454,0.1815],[0.4439,0.1994],[0.4422,0.2172],[0.4403,0.235],[0.4383,0.2528],[0.4359,0.2706],[0.4334,0.2883],[0.4306,0.306],[0.4276,0.3237],[0.4242,0.3413],[0.4206,0.3588],[0.4165,0.3762],[0.4121,0.3936],[0.4072,0.4108],[0.4019,0.4279],[0.396,0.4448],[0.3895,0.4615],[0.3822,0.4779],[0.3742,0.4939],[0.3658,0.5097],[0.3571,0.5254],[0.3481,0.5409],[0.3387,0.5561],[0.329,0.5712],[0.319,0.586],[0.3087,0.6007],[0.2981,0.6151],[0.2873,0.6294],[0.2765,0.6437],[0.2658,0.658],[0.2555,0.6727],[0.2458,0.6878],[0.2371,0.7034],[0.2296,0.7197],[0.2233,0.7364],[0.2181,0.7536],[0.214,0.771],[0.211,0.7887],[0.2092,0.8065],[0.2085,0.8244],[0.2088,0.8423],[0.2101,0.8601],[0.2123,0.8779],[0.2153,0.8956],[0.2191,0.9131],[0.2236,0.9304],[0.2288,0.9476],[0.2346,0.9645],[0.2412,0.9812],[0.2485,0.9975]],[[0.4429,0.0026],[0.4428,0.0206],[0.4426,0.0385],[0.4422,0.0565],[0.4417,0.0745],[0.441,0.0924],[0.4401,0.1104],[0.4392,0.1283],[0.4381,0.1463],[0.4368,0.1642],[0.4354,0.1821],[0.4338,0.2],[0.4321,0.2179],[0.4301,0.2357],[0.428,0.2536],[0.4257,0.2714],[0.4231,0.2892],[0.4203,0.307],[0.4173,0.3247],[0.4139,0.3423],[0.4103,0.3599],[0.4062,0.3774],[0.4018,0.3948],[0.3969,0.4121],[0.3914,0.4292],[0.3853,0.4461],[0.3786,0.4628],[0.3708,0.479],[0.3622,0.4948],[0.3531,0.5103],[0.3437,0.5256],[0.334,0.5407],[0.324,0.5556],[0.3137,0.5703],[0.3031,0.5849],[0.2923,0.5992],[0.2813,0.6135],[0.2704,0.6277],[0.2595,0.642],[0.2489,0.6565],[0.2388,0.6714],[0.2293,0.6867],[0.2208,0.7025],[0.2133,0.7188],[0.2069,0.7356],[0.2017,0.7528],[0.1975,0.7703],[0.1944,0.788],[0.1925,0.8058],[0.1918,0.8238],[0.1921,0.8417],[0.1934,0.8597],[0.1955,0.8775],[0.1985,0.8952],[0.2023,0.9128],[0.2068,0.9302],[0.212,0.9474],[0.2178,0.9644],[0.2244,0.9811],[0.2318,0.9975]],[[0.4881,0.0026],[0.4875,0.02],[0.4871,0.0375],[0.4869,0.0549],[0.4868,0.0723],[0.4869,0.0898],[0.4871,0.1072],[0.4875,0.1247],[0.488,0.1421],[0.4887,0.1595],[0.4895,0.1769],[0.4905,0.1944],[0.4917,0.2118],[0.493,0.2291],[0.4945,0.2465],[0.4962,0.2639],[0.4981,0.2812],[0.5003,0.2985],[0.5027,0.3158],[0.5053,0.333],[0.5083,0.3502],[0.5115,0.3674],[0.515,0.3844],[0.519,0.4014],[0.5233,0.4183],[0.5281,0.4351],[0.5334,0.4517],[0.5393,0.4681],[0.5458,0.4843],[0.5531,0.5001],[0.5613,0.5155],[0.57,0.5306],[0.5788,0.5457],[0.5876,0.5607],[0.5965,0.5758],[0.6053,0.5908],[0.6141,0.6059],[0.6228,0.621],[0.6314,0.6362],[0.6395,0.6516],[0.6471,0.6673],[0.6536,0.6835],[0.6588,0.7001],[0.6627,0.7171],[0.6657,0.7343],[0.668,0.7516],[0.67,0.7689],[0.6716,0.7863],[0.6723,0.8037],[0.6723,0.8211],[0.6717,0.8386],[0.6705,0.856],[0.6689,0.8733],[0.6667,0.8906],[0.6642,0.9079],[0.6612,0.9251],[0.6579,0.9422],[0.6542,0.9593],[0.6502,0.9762],[0.6457,0.9931]],[[0.4708,0.0031],[0.4706,0.0205],[0.4705,0.0378],[0.4707,0.0551],[0.4709,0.0724],[0.4713,0.0898],[0.4718,0.1071],[0.4724,0.1244],[0.4732,0.1417],[0.4741,0.159],[0.4751,0.1763],[0.4763,0.1936],[0.4776,0.2109],[0.479,0.2281],[0.4806,0.2454],[0.4824,0.2626],[0.4844,0.2798],[0.4865,0.297],[0.4888,0.3142],[0.4914,0.3313],[0.4942,0.3484],[0.4972,0.3655],[0.5005,0.3825],[0.5041,0.3994],[0.5081,0.4163],[0.5124,0.4331],[0.5172,0.4498],[0.5224,0.4663],[0.5281,0.4826],[0.5345,0.4987],[0.5415,0.5145],[0.5495,0.5299],[0.5577,0.5452],[0.5658,0.5605],[0.5739,0.5758],[0.5818,0.5912],[0.5897,0.6067],[0.5973,0.6222],[0.6047,0.6379],[0.6118,0.6537],[0.6183,0.6698],[0.624,0.6861],[0.6288,0.7028],[0.6323,0.7197],[0.6349,0.7369],[0.6368,0.7541],[0.6386,0.7713],[0.64,0.7886],[0.6405,0.8059],[0.64,0.8232],[0.639,0.8405],[0.6374,0.8578],[0.6354,0.875],[0.6331,0.8921],[0.6304,0.9093],[0.6275,0.9263],[0.6243,0.9434],[0.6209,0.9604],[0.6172,0.9773],[0.6133,0.9942]],[[0.468,0.0026],[0.4681,0.0196],[0.4682,0.0366],[0.4683,0.0537],[0.4684,0.0707],[0.4685,0.0877],[0.4685,0.1047],[0.4685,0.1217],[0.4686,0.1388],[0.4686,0.1558],[0.4685,0.1728],[0.4685,0.1898],[0.4684,0.2069],[0.4684,0.2239],[0.4683,0.2409],[0.4681,0.2579],[0.468,0.2749],[0.4678,0.292],[0.4676,0.309],[0.4674,0.326],[0.4671,0.343],[0.4668,0.36],[0.4665,0.3771],[0.4661,0.3941],[0.4656,0.4111],[0.4651,0.4281],[0.4645,0.4451],[0.4638,0.4621],[0.463,0.4791],[0.462,0.4961],[0.4607,0.5131],[0.459,0.53],[0.4569,0.5469],[0.4541,0.5637],[0.4507,0.5804],[0.4464,0.5969],[0.4414,0.6131],[0.4357,0.6292],[0.4298,0.6451],[0.4241,0.6612],[0.4189,0.6774],[0.4145,0.6938],[0.4108,0.7104],[0.4077,0.7272],[0.4052,0.744],[0.403,0.7609],[0.4014,0.7778],[0.4002,0.7948],[0.3995,0.8118],[0.3993,0.8288],[0.3996,0.8458],[0.4003,0.8628],[0.4015,0.8798],[0.4032,0.8968],[0.4053,0.9137],[0.4079,0.9305],[0.411,0.9472],[0.4146,0.9638],[0.4188,0.9804],[0.4237,0.9967]],[[0.4708,0],[0.4701,0.0171],[0.4695,0.0342],[0.4688,0.0514],[0.4682,0.0685],[0.4675,0.0856],[0.4669,0.1027],[0.4662,0.1198],[0.4655,0.137],[0.4648,0.1541],[0.4641,0.1712],[0.4635,0.1883],[0.4628,0.2054],[0.4621,0.2225],[0.4613,0.2397],[0.4606,0.2568],[0.4599,0.2739],[0.4592,0.291],[0.4584,0.3081],[0.4577,0.3252],[0.4569,0.3424],[0.4561,0.3595],[0.4553,0.3766],[0.4545,0.3937],[0.4537,0.4108],[0.4528,0.4279],[0.4519,0.445],[0.451,0.4621],[0.4501,0.4793],[0.449,0.4963],[0.4475,0.5134],[0.4455,0.5304],[0.4429,0.5474],[0.4394,0.5641],[0.4351,0.5807],[0.4298,0.597],[0.4236,0.613],[0.4166,0.6286],[0.4095,0.6442],[0.4026,0.6599],[0.3964,0.6759],[0.3911,0.6921],[0.3868,0.7087],[0.3832,0.7255],[0.3804,0.7424],[0.3781,0.7593],[0.3764,0.7764],[0.3752,0.7935],[0.3745,0.8106],[0.3742,0.8277],[0.3745,0.8449],[0.3752,0.862],[0.3764,0.8791],[0.3781,0.8961],[0.3802,0.9131],[0.3828,0.93],[0.3859,0.9469],[0.3895,0.9636],[0.3937,0.9803],[0.3986,0.9967]],[[0.4206,0.0026],[0.4205,0.0213],[0.4201,0.0399],[0.4194,0.0586],[0.4186,0.0772],[0.4176,0.0958],[0.4164,0.1145],[0.415,0.1331],[0.4134,0.1517],[0.4116,0.1702],[0.4096,0.1888],[0.4073,0.2073],[0.4049,0.2258],[0.4021,0.2443],[0.3991,0.2627],[0.3959,0.2811],[0.3923,0.2994],[0.3884,0.3176],[0.3841,0.3358],[0.3794,0.3539],[0.3743,0.3718],[0.3688,0.3896],[0.3627,0.4072],[0.3559,0.4246],[0.3485,0.4418],[0.3403,0.4585],[0.3312,0.4748],[0.3211,0.4905],[0.3104,0.5058],[0.2992,0.5207],[0.2877,0.5354],[0.2756,0.5496],[0.2631,0.5635],[0.2503,0.577],[0.2371,0.5902],[0.2236,0.6031],[0.2099,0.6158],[0.1962,0.6285],[0.1825,0.6412],[0.1691,0.6542],[0.1563,0.6677],[0.1441,0.6819],[0.1331,0.6969],[0.1232,0.7127],[0.1147,0.7293],[0.1076,0.7466],[0.1017,0.7643],[0.097,0.7823],[0.0935,0.8007],[0.0913,0.8192],[0.0903,0.8378],[0.0905,0.8565],[0.0919,0.8751],[0.0946,0.8935],[0.0984,0.9118],[0.1034,0.9298],[0.1094,0.9474],[0.1165,0.9647],[0.1247,0.9814],[0.1342,0.9975]],[[0.5187,0.0026],[0.5189,0.0213],[0.5193,0.0399],[0.5199,0.0586],[0.5207,0.0772],[0.5217,0.0958],[0.5229,0.1145],[0.5243,0.1331],[0.5259,0.1517],[0.5277,0.1702],[0.5297,0.1888],[0.532,0.2073],[0.5345,0.2258],[0.5372,0.2443],[0.5402,0.2627],[0.5434,0.2811],[0.547,0.2994],[0.5509,0.3176],[0.5552,0.3358],[0.5599,0.3539],[0.565,0.3718],[0.5706,0.3896],[0.5767,0.4072],[0.5834,0.4246],[0.5909,0.4418],[0.5991,0.4585],[0.6081,0.4748],[0.6182,0.4905],[0.6289,0.5058],[0.6401,0.5207],[0.6517,0.5354],[0.6637,0.5496],[0.6762,0.5635],[0.689,0.577],[0.7022,0.5902],[0.7157,0.6031],[0.7294,0.6158],[0.7431,0.6285],[0.7568,0.6412],[0.7702,0.6542],[0.7831,0.6677],[0.7952,0.6819],[0.8062,0.6969],[0.8161,0.7127],[0.8246,0.7293],[0.8318,0.7466],[0.8376,0.7643],[0.8423,0.7823],[0.8458,0.8007],[0.848,0.8192],[0.8491,0.8378],[0.8488,0.8565],[0.8474,0.8751],[0.8447,0.8935],[0.8409,0.9118],[0.836,0.9298],[0.8299,0.9474],[0.8228,0.9647],[0.8146,0.9814],[0.8051,0.9975]],[[0.5299,0.0026],[0.53,0.0214],[0.5304,0.0402],[0.5311,0.059],[0.532,0.0778],[0.533,0.0966],[0.5343,0.1154],[0.5358,0.1342],[0.5374,0.1529],[0.5394,0.1716],[0.5415,0.1903],[0.5438,0.209],[0.5465,0.2277],[0.5494,0.2462],[0.5525,0.2648],[0.556,0.2833],[0.5598,0.3017],[0.564,0.3201],[0.5685,0.3383],[0.5736,0.3565],[0.579,0.3745],[0.5851,0.3923],[0.5916,0.4099],[0.5989,0.4273],[0.607,0.4443],[0.6159,0.4609],[0.6257,0.4769],[0.6367,0.4922],[0.6484,0.507],[0.6604,0.5214],[0.6728,0.5356],[0.6856,0.5494],[0.6988,0.5628],[0.7123,0.576],[0.726,0.5888],[0.74,0.6014],[0.7541,0.6139],[0.7682,0.6264],[0.7822,0.639],[0.7958,0.6519],[0.8089,0.6654],[0.8213,0.6796],[0.8326,0.6946],[0.8427,0.7105],[0.8515,0.7272],[0.8589,0.7445],[0.8649,0.7623],[0.8698,0.7805],[0.8734,0.7989],[0.8758,0.8176],[0.8769,0.8364],[0.8768,0.8552],[0.8754,0.874],[0.8728,0.8926],[0.869,0.911],[0.864,0.9292],[0.858,0.947],[0.8508,0.9644],[0.8426,0.9813],[0.833,0.9975]],[[0.3373,0.0035],[0.3349,0.0243],[0.3323,0.0451],[0.3293,0.0659],[0.3261,0.0867],[0.3226,0.1073],[0.3189,0.128],[0.315,0.1486],[0.3108,0.1692],[0.3063,0.1897],[0.3015,0.2101],[0.2965,0.2305],[0.2911,0.2507],[0.2854,0.2709],[0.2793,0.291],[0.2728,0.311],[0.2659,0.3308],[0.2586,0.3505],[0.2508,0.3699],[0.2424,0.3892],[0.2333,0.4081],[0.2234,0.4266],[0.212,0.4442],[0.1991,0.4608],[0.1851,0.4763],[0.1701,0.491],[0.1543,0.5048],[0.1379,0.5179],[0.121,0.5303],[0.1037,0.5422],[0.0861,0.5537],[0.0683,0.5648],[0.0503,0.5755],[0.0322,0.5861],[0.0139,0.5965],[-0.0043,0.6068],[-0.0226,0.6171],[-0.0408,0.6275],[-0.059,0.638],[-0.077,0.6488],[-0.0948,0.6599],[-0.1123,0.6714],[-0.1295,0.6835],[-0.146,0.6964],[-0.1619,0.7102],[-0.1766,0.7251],[-0.1899,0.7413],[-0.2011,0.759],[-0.2097,0.7782],[-0.2161,0.7982],[-0.221,0.8185],[-0.2244,0.8392],[-0.2261,0.8602],[-0.2259,0.8811],[-0.2238,0.902],[-0.2198,0.9226],[-0.2138,0.9427],[-0.2057,0.962],[-0.1957,0.9805],[-0.1835,0.9975]],[[0.6272,0.0035],[0.6306,0.0249],[0.6346,0.0462],[0.6391,0.0675],[0.6439,0.0887],[0.6492,0.1097],[0.6548,0.1307],[0.6608,0.1516],[0.6671,0.1723],[0.6739,0.1929],[0.6811,0.2134],[0.6887,0.2338],[0.6968,0.2539],[0.7054,0.2739],[0.7144,0.2936],[0.724,0.3131],[0.7342,0.3323],[0.7449,0.3512],[0.7562,0.3697],[0.7682,0.3878],[0.7809,0.4053],[0.7944,0.4223],[0.8089,0.4386],[0.8242,0.4539],[0.8403,0.4685],[0.857,0.4824],[0.8742,0.4956],[0.8918,0.5083],[0.9098,0.5205],[0.9281,0.5322],[0.9465,0.5436],[0.9652,0.5547],[0.984,0.5656],[1.0029,0.5763],[1.0218,0.5869],[1.0408,0.5974],[1.0598,0.6079],[1.0788,0.6185],[1.0976,0.6293],[1.1164,0.6402],[1.1349,0.6515],[1.1531,0.6633],[1.1711,0.6756],[1.1884,0.6886],[1.2051,0.7025],[1.2208,0.7174],[1.2352,0.7337],[1.2476,0.7515],[1.2575,0.7708],[1.2648,0.7912],[1.2705,0.8122],[1.2745,0.8335],[1.2767,0.8551],[1.277,0.8768],[1.2752,0.8984],[1.2713,0.9198],[1.2653,0.9406],[1.2572,0.9607],[1.247,0.9799],[1.2343,0.9975]],[[0.6317,0.0046],[0.6351,0.0263],[0.639,0.0479],[0.6435,0.0695],[0.6484,0.0909],[0.6538,0.1122],[0.6596,0.1334],[0.6659,0.1545],[0.6726,0.1754],[0.6798,0.1962],[0.6874,0.2168],[0.6956,0.2372],[0.7044,0.2574],[0.7136,0.2773],[0.7235,0.297],[0.734,0.3163],[0.7451,0.3353],[0.7569,0.3538],[0.7694,0.3719],[0.7826,0.3895],[0.7967,0.4064],[0.8115,0.4226],[0.8273,0.4379],[0.8437,0.4525],[0.8607,0.4665],[0.8782,0.4798],[0.8961,0.4925],[0.9144,0.5048],[0.9329,0.5167],[0.9516,0.5282],[0.9705,0.5394],[0.9895,0.5504],[1.0087,0.5612],[1.0279,0.5719],[1.0472,0.5826],[1.0664,0.5932],[1.0857,0.6038],[1.1048,0.6145],[1.1239,0.6254],[1.1429,0.6366],[1.1616,0.6481],[1.1801,0.66],[1.1982,0.6724],[1.2159,0.6856],[1.2328,0.6995],[1.2488,0.7146],[1.2636,0.7309],[1.2766,0.7486],[1.287,0.7679],[1.2947,0.7886],[1.3005,0.8097],[1.3048,0.8313],[1.3072,0.8531],[1.3077,0.8751],[1.306,0.897],[1.3022,0.9187],[1.2962,0.9398],[1.2881,0.9602],[1.2777,0.9796],[1.265,0.9975]],[[0.3066,0.0035],[0.3031,0.0265],[0.2988,0.0493],[0.294,0.0721],[0.2887,0.0947],[0.2829,0.1173],[0.2766,0.1397],[0.2699,0.1619],[0.2627,0.184],[0.255,0.206],[0.2468,0.2277],[0.2381,0.2493],[0.2289,0.2707],[0.2192,0.2918],[0.2089,0.3127],[0.1981,0.3332],[0.1866,0.3535],[0.1746,0.3734],[0.162,0.393],[0.1487,0.4121],[0.1346,0.4306],[0.119,0.4478],[0.1022,0.4639],[0.0845,0.479],[0.066,0.4929],[0.0468,0.5061],[0.0271,0.5185],[0.007,0.5302],[-0.0135,0.5413],[-0.0342,0.5518],[-0.0551,0.5619],[-0.0763,0.5717],[-0.0975,0.5811],[-0.1189,0.5903],[-0.1403,0.5993],[-0.1618,0.6082],[-0.1833,0.617],[-0.2049,0.6259],[-0.2263,0.6348],[-0.2478,0.6438],[-0.2691,0.6531],[-0.2903,0.6627],[-0.3112,0.6728],[-0.3319,0.6836],[-0.3521,0.6951],[-0.3716,0.7077],[-0.3901,0.7217],[-0.4071,0.7376],[-0.4216,0.7558],[-0.432,0.7765],[-0.4392,0.7986],[-0.4445,0.8213],[-0.448,0.8443],[-0.4492,0.8675],[-0.4482,0.8907],[-0.4448,0.9137],[-0.4389,0.9362],[-0.4306,0.9579],[-0.4199,0.9785],[-0.4065,0.9975]],[[0.6468,0.0022],[0.6503,0.0258],[0.6547,0.0492],[0.6597,0.0725],[0.6654,0.0956],[0.6717,0.1186],[0.6786,0.1414],[0.6861,0.1639],[0.6943,0.1863],[0.7031,0.2085],[0.7125,0.2303],[0.7226,0.2519],[0.7335,0.2731],[0.745,0.294],[0.7573,0.3143],[0.7703,0.3343],[0.7841,0.3537],[0.7987,0.3725],[0.8141,0.3906],[0.8304,0.408],[0.8475,0.4246],[0.8656,0.4401],[0.8845,0.4546],[0.904,0.4683],[0.924,0.4812],[0.9444,0.4935],[0.9652,0.5052],[0.9862,0.5164],[1.0074,0.5272],[1.0288,0.5377],[1.0503,0.5478],[1.072,0.5577],[1.0937,0.5674],[1.1155,0.577],[1.1374,0.5865],[1.1592,0.596],[1.1811,0.6055],[1.2029,0.6151],[1.2246,0.6247],[1.2463,0.6346],[1.2679,0.6448],[1.2892,0.6553],[1.3103,0.6663],[1.3311,0.678],[1.3514,0.6904],[1.371,0.7039],[1.3897,0.7187],[1.4068,0.7353],[1.4214,0.754],[1.4324,0.7751],[1.4398,0.7977],[1.4451,0.8209],[1.4484,0.8445],[1.4492,0.8683],[1.4476,0.8921],[1.4434,0.9155],[1.4366,0.9383],[1.4273,0.9603],[1.4156,0.981],[1.4013,1]]];
+  </script>
+  <script>
+/* ============================================================================
+   tray-flow.js — glowing particles travelling down the ontology tray ribs.
+   Self-contained: creates its own <canvas> inside #trayLayer, runs its own
+   throttled rAF loop, pauses off-screen / when hidden / reduced-motion.
+
+   Requires window.RIB_PATHS (from ontology-ribs.js) — include that FIRST:
+     <script src="ontology-ribs.js"><\/script>
+     <script src="tray-flow.js"><\/script>
+
+   Alignment: values live on window.RIB. Open the page with #tune in the URL
+   for an on-screen tuner, or set e.g. RIB.xpx = 8 in DevTools.
+   ============================================================================ */
+(function () {
+  'use strict';
+  const DPR_CAP = 1.5;
+  const FRAME_MS = 1000 / 30;
+  function smoothstep(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+
+  // Registration of the rib artwork onto the tray box (see #tune tuner / DevTools).
+  const RIB = window.RIB = window.RIB || { xscale: 1.0, yscale: 1.0, xpx: 8, ypx: 0, debug: false };
+
+  function init() {
+    const trayLayer = document.getElementById('trayLayer');
+    if (!trayLayer) return;
+    const paths = (window.RIB_PATHS && window.RIB_PATHS.length) ? window.RIB_PATHS : null;
+    if (!paths) { console.warn('[tray-flow] window.RIB_PATHS missing — include ontology-ribs.js before tray-flow.js'); return; }
+
+    let canvas = document.getElementById('trayFlow');
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.id = 'trayFlow'; canvas.setAttribute('aria-hidden', 'true');
+      canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+      trayLayer.appendChild(canvas);
+    }
+    const ctx = canvas.getContext('2d');
+    let TW = 0, THh = 0;
+
+    // cached soft radial-glow sprite (fast — no shadowBlur)
+    const glow = document.createElement('canvas'); glow.width = glow.height = 64;
+    (function () {
+      const g = glow.getContext('2d'); const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(0.25, 'rgba(255,255,255,0.85)');
+      rg.addColorStop(0.5, 'rgba(255,255,255,0.28)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
+    })();
+
+    function ribPoint(path, t) {
+      const f = t * (path.length - 1);
+      const i0 = Math.min(path.length - 2, Math.max(0, Math.floor(f)));
+      const fr = f - i0;
+      const nx = path[i0][0] + (path[i0 + 1][0] - path[i0][0]) * fr;
+      const ny = path[i0][1] + (path[i0 + 1][1] - path[i0][1]) * fr;
+      return [TW * 0.5 + (nx - 0.5) * THh * RIB.xscale + RIB.xpx, ny * THh * RIB.yscale + RIB.ypx];
+    }
+
+    // fewer particles on the far-left/right (outer) ribs
+    const pathW = paths.map(p => { let md = 0; for (const q of p) { const d = Math.abs(q[0] - 0.5); if (d > md) md = d; } return Math.max(0.10, 1 - Math.pow(Math.min(1, md / 0.95), 1.3)); });
+    const pathWsum = pathW.reduce((a, b) => a + b, 0);
+    function pickPath() { let r = Math.random() * pathWsum; for (let i = 0; i < pathW.length; i++) { r -= pathW[i]; if (r <= 0) return i; } return pathW.length - 1; }
+
+    const N = 46, parts = [];
+    function spawn(p, initial) {
+      p.path = pickPath();
+      p.t = initial ? Math.random() : 0;
+      p.spd = 0.10 + Math.random() * 0.20;
+      p.size = 0.45 + Math.random() * 0.8;
+      p.op = 0.45 + Math.random() * 0.55;
+      p.wait = initial ? Math.random() * 4.5 : 0.4 + Math.random() * 3.0;
+    }
+    for (let i = 0; i < N; i++) { const p = {}; spawn(p, true); parts.push(p); }
+
+    function sizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+      const box = canvas.getBoundingClientRect();
+      TW = box.width; THh = box.height;
+      if (TW < 2 || THh < 2) return;
+      canvas.width = Math.max(1, Math.round(TW * dpr));
+      canvas.height = Math.max(1, Math.round(THh * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function frame(dt) {
+      if (TW < 2 || THh < 2) { sizeCanvas(); if (TW < 2 || THh < 2) return; }
+      ctx.clearRect(0, 0, TW, THh);
+      if (RIB.debug) {
+        ctx.strokeStyle = 'rgba(255,90,90,0.7)'; ctx.lineWidth = 1;
+        for (const path of paths) { ctx.beginPath(); for (let i = 0; i < path.length; i++) { const q = ribPoint(path, i / (path.length - 1)); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); } ctx.stroke(); }
+      }
+      const gs = Math.max(0.65, THh / 320);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < N; i++) {
+        const p = parts[i];
+        if (p.wait > 0) { p.wait -= dt; continue; }
+        p.t += p.spd * dt;
+        if (p.t >= 1) { spawn(p, false); continue; }
+        const q = ribPoint(paths[p.path], p.t);
+        const a = p.op * smoothstep(0.10, 0.26, p.t) * (1 - smoothstep(0.80, 1.0, p.t));
+        if (a <= 0.01) continue;
+        const gr = (p.size + 0.9) * 1.9 * gs;
+        ctx.globalAlpha = a * 0.5; ctx.drawImage(glow, q[0] - gr, q[1] - gr, gr * 2, gr * 2);
+        const cr = p.size * 1.2 * gs;
+        ctx.globalAlpha = a; ctx.drawImage(glow, q[0] - cr, q[1] - cr, cr * 2, cr * 2);
+      }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+
+    /* run/pause loop */
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let running = false, onScreen = true, hidden = false, last = 0, lastFrame = 0;
+    function tick(now) {
+      if (!running) return;
+      requestAnimationFrame(tick);
+      if (now - lastFrame < FRAME_MS) return;
+      const dt = Math.min((now - last) / 1000, 0.05); last = now; lastFrame = now;
+      frame(dt);
+    }
+    function maybeRun() {
+      if (reduced || hidden || !onScreen) { running = false; return; }
+      if (!running) { running = true; last = performance.now(); lastFrame = 0; requestAnimationFrame(tick); }
+    }
+
+    sizeCanvas();
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(sizeCanvas).observe(trayLayer);
+    window.addEventListener('resize', sizeCanvas);
+    document.addEventListener('visibilitychange', () => { hidden = document.hidden; maybeRun(); });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((es) => { es.forEach(e => { onScreen = e.isIntersecting; maybeRun(); }); }, { threshold: 0.01 }).observe(trayLayer);
+    }
+    maybeRun();
+    buildTuner();
+
+    /* on-screen alignment tuner — activate with #tune in the URL */
+    function buildTuner() {
+      if (!/tune/.test(location.hash)) return;
+      RIB.debug = true;
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;top:12px;right:12px;z-index:99999;background:rgba(8,8,14,.92);color:#fff;font:12px/1.6 monospace;padding:10px 12px;border:1px solid #333;border-radius:8px;width:200px;';
+      const fields = [['xpx', 'X shift (px)', 1], ['ypx', 'Y shift (px)', 1], ['xscale', 'X scale', 0.005], ['yscale', 'Y scale', 0.005]];
+      let html = '<div style="margin-bottom:6px;letter-spacing:.12em;opacity:.65">RIB TUNER</div>'
+        + '<label style="display:flex;gap:6px;align-items:center;margin:5px 0"><input type="checkbox" id="ribDbg" checked> show rib lines</label>';
+      for (const [k, label, step] of fields)
+        html += '<label style="display:flex;justify-content:space-between;gap:8px;margin:5px 0">' + label
+          + '<input type="number" id="rib_' + k + '" value="' + RIB[k] + '" step="' + step
+          + '" style="width:74px;background:#000;color:#fff;border:1px solid #444;border-radius:4px;padding:2px 4px"></label>';
+      html += '<div id="ribOut" style="margin-top:8px;opacity:.6;word-break:break-all"></div>';
+      box.innerHTML = html; document.body.appendChild(box);
+      const out = box.querySelector('#ribOut');
+      const upd = () => { out.textContent = 'xscale:' + RIB.xscale + ', yscale:' + RIB.yscale + ', xpx:' + RIB.xpx + ', ypx:' + RIB.ypx; };
+      box.querySelector('#ribDbg').addEventListener('change', e => { RIB.debug = e.target.checked; });
+      for (const [k] of fields) box.querySelector('#rib_' + k).addEventListener('input', e => { RIB[k] = parseFloat(e.target.value) || 0; upd(); });
+      upd();
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+  </script>
+
+  <!-- Curve pin: lock the shared curved line to the turbine so it lands in the
+       same place in every browser and at every window size. The curve used to
+       sit at a fixed pixel offset from the top of .curve-band, but the sections
+       it aligns with scale with the viewport (100vh hero, 92vh turbine) — so
+       different window heights (e.g. Safari vs Chrome) drifted them apart. The
+       turbine loop sits at a constant fraction of the curve's own height, so we
+       hold the loop on the turbine's centre: top = turbineCentre − FRAC·height. -->
+  <script>
+  (function () {
+    const mq      = window.matchMedia('(min-width: 1024px)');
+    const band    = document.querySelector('.curve-band');
+    const curve   = document.querySelector('.page-curve');
+    const turbine = document.querySelector('#vision .ci-visual');
+    if (!band || !curve || !turbine) return;
+
+    // Tuned in-browser and baked here so every browser/window size places the
+    // curve identically. Re-tune with the slider panel (git history) if needed.
+    const LOOP_FRAC = 0.365;
+
+    function place() {
+      if (!mq.matches) { curve.style.top = ''; return; }   // curve is hidden < 1024px
+      const b = band.getBoundingClientRect();
+      const c = curve.getBoundingClientRect();
+      const t = turbine.getBoundingClientRect();
+      if (!c.height || !t.height) return;                  // not laid out yet
+      const turbineC = (t.top - b.top) + t.height / 2;     // turbine centre, relative to the band
+      curve.style.top = (turbineC - LOOP_FRAC * c.height) + 'px';
+    }
+
+    const kick = () => requestAnimationFrame(place);
+    kick();
+    window.addEventListener('resize', kick, { passive: true });
+    window.addEventListener('load', kick);
+    if (!curve.complete) curve.addEventListener('load', kick, { once: true });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(kick);
+  })();
   </script>
 
 </body>
