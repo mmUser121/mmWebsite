@@ -171,7 +171,12 @@
     .hero-darken {
       position: absolute;
       inset: 0;
-      background: #000000;
+      /* #06060E, not #000000: the hero is sticky-pinned behind the whole page,
+         and this overlay stays at 0.55 alpha once scrolled past. With pure black
+         the pinned hero settled at ~#030306, which bled through the transparent
+         curve-band sections (2–4) as a darker background than the #06060E used
+         elsewhere. Darkening toward the page colour keeps them all #06060E. */
+      background: #06060E;
       opacity: var(--hero-darken-alpha);
       z-index: 3;
       pointer-events: none;
@@ -585,14 +590,6 @@
       pointer-events: none;
     }
 
-    /* The V1 hero/section-bc overlap (negative margin-top on .section-bc)
-       no longer applies when the feature reel is sandwiched between them
-       — neutralise it so section-bc sits cleanly below the reel. The
-       hero-to-reel and reel-to-bloom transitions get tuned in a later step. */
-    .feature-reel + .section-bc {
-      margin-top: 0;
-    }
-
     /* ===========================
        Section — "Connected Understanding" (turbine)
        =========================== */
@@ -742,274 +739,7 @@
     }
 
     /* ===========================
-       Sections B + C — Transition Visual + "We are MatterMind"
-       Combined into a single stage so on desktop the caption can overlap
-       the bloom on the left and the C content can overlap on the right.
-       On mobile they stack vertically.
-       =========================== */
-    .section-bc {
-      position: relative;
-      background-color: #06060E;
-      padding: 0 0 clamp(10px, 1.25vw, 20px);  /* halved — divider sits closer */
-      margin-top: -20px;                       /* mobile: small pull-up under hero */
-    }
-
-    .bc-stage {
-      position: relative;
-      width: 100%;
-    }
-
-    .bloom-wrap {
-      position: relative;                   /* positioning context for the right-half pulse canvas */
-      width: 100vw;                         /* mobile: full-bleed across viewport */
-      max-width: 100vw;
-      aspect-ratio: 1 / 1;
-      margin-left: calc(50% - 50vw);
-      margin-right: calc(50% - 50vw);
-      background-color: #06060E;
-      background-image: url('images/quantum_bloom_img.webp');
-      background-size: 135%;                /* zoom in so the bloom fills the frame */
-      background-position: center center;
-      background-repeat: no-repeat;
-      background-blend-mode: screen;
-      /* Top-to-bottom mask: fades the wrapper's top 35% from transparent
-         up to fully opaque. Wherever the bloom-wrap's top edge falls
-         (against the hero's bottom or below), the seam dissolves smoothly
-         instead of showing a hard cropped image edge. */
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 35%, black 100%);
-              mask-image: linear-gradient(to bottom, transparent 0%, black 35%, black 100%);
-      /* Slow reveal — fades in + scales up when .in-view is added by the
-         dedicated bloom-wrap IntersectionObserver. No filter:blur (that was
-         the previous fps killer). The bloom-pulse canvas inside is held
-         off until the transform transitionend fires (see JS) so the GPU
-         isn't fighting an animating wrapper AND a live canvas. */
-      opacity: 0.1;
-      transform: scale(0.70);
-      transition:
-        opacity   1800ms cubic-bezier(.16, .84, .32, 1),
-        transform 1800ms cubic-bezier(.16, .84, .32, 1);
-      will-change: opacity, transform;
-    }
-    .bloom-wrap.in-view {
-      opacity: 1;
-      transform: scale(1);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .bloom-wrap {
-        opacity: 1;
-        transform: none;
-        transition: none;
-      }
-    }
-
-
-    /* Mobile: scale the bloom up to match the design reference. Image is
-       square (5700×5700) so to keep the previous 175% scale without
-       cropping the bright bloom shape, the wrapper is taller than wide.
-       Aspect 1/1.5 trims only the OUTER DARK-FADE margins of the image
-       (visually indistinguishable from the page bg) while preserving the
-       bright bloom-core fully — keeps the layout visually compact above
-       and below. */
-    @media (max-width: 767px) {
-      .bloom-wrap {
-        aspect-ratio: 1 / 1.5;          /* wrapper 100vw × 150vw */
-        background-size: 210%;          /* image renders 210vw × 210vw — cropped ~55vw each side */
-        /* Add side fades to the existing top-fade mask. At final scale the
-           wrapper edges sit at the viewport edges (invisible), but during
-           the reveal scale-up they sit inside the viewport — without these
-           fades the cropped image edge shows as a hard vertical line on
-           each side. mask-composite: intersect (= source-in for -webkit-)
-           multiplies the layer alphas so all three fades apply together. */
-        -webkit-mask-image:
-          linear-gradient(to bottom, transparent 0%, black 35%, black 100%),
-          linear-gradient(to right,  transparent 0%, black 8%,  black 92%, transparent 100%);
-                mask-image:
-          linear-gradient(to bottom, transparent 0%, black 35%, black 100%),
-          linear-gradient(to right,  transparent 0%, black 8%,  black 92%, transparent 100%);
-        -webkit-mask-composite: source-in;
-                mask-composite: intersect;
-      }
-    }
-
-    /* ===== BEGIN: bloom right-half pulse (CSS) =======================
-       Soft radial brightness pulse on the right half of the bloom — the
-       "alive with intelligence" heartbeat. To disable, delete this CSS
-       block, the matching <canvas id="bloomPulse"> in the HTML, and the
-       matching JS IIFE marked "bloom right-half pulse". */
-    .bloom-pulse {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 1;
-    }
-    /* ===== END: bloom right-half pulse (CSS) ========================= */
-
-    /* --- Mobile: caption + C-text both stack below the bloom --- */
-    .caption-block {
-      max-width: 380px;
-      margin-top: clamp(20px, 3vw, 36px);
-    }
-    @media (max-width: 767px) {
-      /* Pull the caption block UP so the white line + QUANTUM BLOOMS:
-         text overlap the lower fade region of the bloom image. Everything
-         below in the document flow shifts up by the same amount. */
-      .caption-block { margin-top: -100px; }
-    }
-
-    .caption-rule {
-      display: block;
-      position: relative;
-      /* Starts at 0; extends to its target width when .caption-block.in-view
-         is set by the reveal IntersectionObserver. */
-      width: 0;
-      height: 1px;
-      background: #FFFFFF;
-      margin-bottom: 16px;
-      transition: width 1120ms cubic-bezier(.16, .84, .32, 1);
-    }
-    .caption-rule::after {
-      content: "";
-      position: absolute;
-      right: -4px;
-      top: 50%;
-      width: 8px;
-      height: 8px;
-      background: #FFFFFF;
-      transform: translateY(-50%);
-    }
-    /* Mobile: line extends from the caption-block's left edge out to the
-       horizontal centre of the viewport — matches the desktop intent where
-       the line ends below the bloom's bright glow (which is also centred).
-       The offset matches the section container's mobile px-10 (40px) and
-       md:px-6 (24px) padding. */
-    .caption-block.in-view .caption-rule { width: calc(50vw - 40px); }
-    @media (min-width: 768px) {
-      .caption-block.in-view .caption-rule { width: calc(50vw - 24px); }
-    }
-
-    .caption-tag {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 0.18em;
-      color: rgba(255, 255, 255, 0.78);
-      margin-bottom: 8px;
-    }
-
-    .caption-text {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 11px;
-      line-height: 1.7;
-      letter-spacing: 0.02em;
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    /* Caption tag + body fade in AFTER the line has finished drawing. The
-       parent's generic .reveal-up fade-up is suppressed (see override below)
-       so the line + text orchestration is the only motion in this block. */
-    .caption-block .caption-tag,
-    .caption-block .caption-text {
-      opacity: 0;
-      transform: translateY(6px);
-      transition:
-        opacity 840ms cubic-bezier(.2, .7, .2, 1) 1050ms,
-        transform 840ms cubic-bezier(.2, .7, .2, 1) 1050ms;
-    }
-    .caption-block.in-view .caption-tag,
-    .caption-block.in-view .caption-text {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .caption-rule,
-      .caption-block .caption-tag,
-      .caption-block .caption-text {
-        transition: none !important;
-        opacity: 1 !important;
-        transform: none !important;
-      }
-      /* Static fallback widths at rest — match the in-view targets per breakpoint. */
-      .caption-rule { width: calc(50vw - 40px) !important; }
-    }
-    @media (prefers-reduced-motion: reduce) and (min-width: 768px) {
-      .caption-rule { width: calc(50vw - 24px) !important; }
-    }
-    @media (prefers-reduced-motion: reduce) and (min-width: 1024px) {
-      /* Desktop static fallback — line stretches the full caption block. */
-      .caption-rule { width: 100% !important; }
-    }
-
-    .c-content {
-      margin-top: clamp(56px, 9vw, 100px);
-      max-width: 56ch;
-    }
-
-    /* --- Desktop: overlay both caption and C-content over the bloom --- */
-    @media (min-width: 1024px) {
-      /* Desktop: moderate pull-up so the bloom slides slightly under the
-         hero. The mask-image on .bloom-wrap fades its top 35% to handle
-         the actual seam smoothness. */
-      .section-bc {
-        margin-top: clamp(-220px, -14vw, -120px);
-      }
-      .bloom-wrap {
-        width: 100%;
-        max-width: 2732px;
-        margin-left: auto;
-        margin-right: auto;
-        background-size: 118%;
-        /* Slightly larger bg-size than before (was 108%) — extra 10% gives
-           the parallax controller vertical room to drift without exposing
-           the navy underneath. */
-        background-position: center calc(50% + var(--parallax-y, 0px));
-      }
-
-      .caption-tag  { font-size: 12px; }
-      .caption-text { font-size: 12px; }
-
-      .caption-block {
-        position: absolute;
-        left: 4%;
-        top: 58%;                          /* line sits below the bloom's bright glow */
-        width: 46%;                        /* line extends from caption to the centre of the stage */
-        max-width: none;
-        margin: 0;
-        z-index: 3;
-      }
-      /* On desktop the connector line stretches the full width of the
-         caption-block — its right end (with the white square) lands at
-         50% of the stage, directly below the bright glow of the bloom.
-         Targets .in-view so the line still draws out from 0 on scroll. */
-      .caption-block.in-view .caption-rule {
-        width: 100%;
-      }
-      /* Constrain only the text — the line stays long. */
-      .caption-block .caption-tag,
-      .caption-block .caption-text {
-        max-width: 360px;
-      }
-
-      /* C content sits with its LEFT EDGE at the centre of the stage,
-         overlapping the right-hand portion of the bloom — anchored to the
-         lower portion of the bloom to match the desktop design reference. */
-      .c-content {
-        position: absolute;
-        left: 50%;
-        /* Pushed down ~100px from the original 62% anchor so "We are"
-           lands on a darker patch of the bloom and reads more clearly. */
-        top: calc(62% + 100px);
-        margin: 0;
-        z-index: 3;
-        max-width: 50%;
-        padding-right: clamp(20px, 3vw, 56px);
-      }
-
-    }
-
-    /* ===========================
-       Body copy (used inside the bc-stage)
+       Body copy (used in the turbine + industries sections)
        =========================== */
     .body-copy { max-width: 56ch; }
     .body-copy p {
@@ -1442,6 +1172,10 @@
       background-position: center calc(50% + var(--parallax-y, 0px));
       background-repeat: no-repeat;
       background-color: #06060E;
+      /* The bloom image's near-black backdrop is #030308 — darker than the page
+         #06060E. "lighten" blends the image against the #06060E fill so that
+         backdrop lifts to exactly #06060E, while the brighter bloom is unaffected. */
+      background-blend-mode: lighten;
       z-index: 1;
     }
     @media (min-width: 1024px) {
@@ -1578,7 +1312,7 @@
     /* Plain dark footer (per the design — no line-art background). */
     .section-h {
       position: relative;
-      background-color: #1C1C23;   /* lighter fill segments the footer + lifts the form fields */
+      background-color: #13131A;   /* lighter fill segments the footer + lifts the form fields */
       padding: clamp(60px, 9vw, 140px) 0 0;
     }
 
@@ -3082,9 +2816,9 @@
       } else maybeRun();
     })();
 
-    // Sections B / C / D — generic fade-up reveal on scroll. Any element with
-    // .reveal-up gets .in-view added when it enters the viewport. Per-element
-    // delay can be set via inline `--reveal-delay` (see .c-content above).
+    // Generic fade-up reveal on scroll. Any element with .reveal-up gets
+    // .in-view added when it enters the viewport. Per-element delay can be set
+    // via inline `--reveal-delay` (e.g. the .think-body paragraph).
     (function () {
       const items = document.querySelectorAll('.reveal-up');
       if (!items.length) return;
@@ -3101,52 +2835,6 @@
         });
       }, { threshold: 0.2 });
       items.forEach(el => observer.observe(el));
-    })();
-
-    // Section B+C — dedicated observer that adds .in-view to .caption-block
-    // ONLY when most of it is on screen (threshold 0.9). On both desktop
-    // and mobile, the caption-block enters the viewport only after most
-    // of the bloom has scrolled into view, so this threshold delays the
-    // line + caption text reveal until "most of the bloom is visible".
-    (function () {
-      const block = document.querySelector('.caption-block');
-      if (!block) return;
-      if (!('IntersectionObserver' in window)) {
-        block.classList.add('in-view');
-        return;
-      }
-      const io = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            block.classList.add('in-view');
-            io.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.9 });
-      io.observe(block);
-    })();
-
-    // Section B+C — bloom-wrap reveal trigger. Adds .in-view to the wrapper
-    // when 50% of the bloom is actually in the viewport. Earlier thresholds
-    // fired too soon — the animation completed while the user was still
-    // looking at the hero. Threshold 0.5 ensures the user has scrolled
-    // far enough that the fade + scale plays out across the visible bloom.
-    (function () {
-      const wrap = document.querySelector('.bloom-wrap');
-      if (!wrap) return;
-      if (!('IntersectionObserver' in window)) {
-        wrap.classList.add('in-view');
-        return;
-      }
-      const io = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            wrap.classList.add('in-view');
-            io.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.5 });
-      io.observe(wrap);
     })();
 
     // Section 6 — bloom reveal coordinator. On scroll-in: the base scene
@@ -3324,263 +3012,6 @@
       update();
     })();
 
-    // ===== BEGIN: bloom right-half pulse (JS) ====================
-    // Section B/C — single static white glow at the centre of the bloom
-    // PLUS warm "ember" particles emitting from that central point and
-    // drifting outward. The breathing pulse halo was removed; now there's
-    // only the steady glow and the embers. Cheap: one gradient + a handful
-    // of small arc draws per frame, 30fps cap, IO-paused when off-screen,
-    // prefers-reduced-motion guard. To disable, delete this entire block,
-    // the matching CSS block, and the matching <canvas>.
-    (function () {
-      const canvas = document.getElementById('bloomPulse');
-      if (!canvas) return;
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-      const ctx = canvas.getContext('2d');
-      const stage = canvas.parentElement;       // .bloom-wrap
-      const DPR = Math.min(window.devicePixelRatio || 1, 1.25);
-      const FRAME_MS = 1000 / 24;               // ambient effect — 24fps is plenty
-      const EMBER_MAX = 192;
-
-      let W = 0, H = 0;
-      let sizeScale = 1.0;                      // particle size multiplier — bumped on mobile
-      const embers = [];
-
-      function resize() {
-        // Use offsetWidth/Height (layout size, transform-independent) so the
-        // canvas always tracks the wrapper's natural box even while .bloom-wrap
-        // is mid-reveal at scale(0.70). getBoundingClientRect would return the
-        // post-transform rect — that previously caused the canvas to be sized
-        // and anchored to the wrapper's top-left at 70% size on first init.
-        // Don't set canvas.style.width/height — the CSS rule
-        // .bloom-pulse { width: 100%; height: 100% } handles display sizing.
-        W = stage.offsetWidth;
-        H = stage.offsetHeight;
-        canvas.width = Math.round(W * DPR);
-        canvas.height = Math.round(H * DPR);
-        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        // The bloom image is rendered ~30% larger on mobile (background-size
-        // 175% vs 135%); scale particles to match so they don't shrink
-        // visually relative to the bigger bloom.
-        sizeScale = window.innerWidth < 768 ? 1.35 : 1.0;
-      }
-
-      // Single emitter at the centre of the bloom — both the white glow
-      // and the embers radiate from this one point.
-      function focalX() { return W * 0.50; }
-      function focalY() { return H * 0.50; }
-
-      function spawnEmber() {
-        // Polar-coord motion: each particle has an angle (direction) and a
-        // radius (distance from centre). Each frame the radius grows
-        // (outward drift) AND the angle shifts (swirl around the centre).
-        const angle = Math.random() * Math.PI * 2;
-        const radialVel = 2.20 + Math.random() * 4.20;
-        // Angular velocity in rad/frame — random sign so some particles
-        // swirl clockwise and some counter-clockwise. ±0.10 rad/frame at
-        // 24fps ≈ ±0.4 rotations per second; combined with the outward
-        // drift this yields a clear curved spiral path per particle.
-        const angularVel = (Math.random() - 0.5) * 0.20;
-        const maxRadius = W * (0.32 + Math.random() * 0.18);
-        return {
-          cx: focalX(),
-          cy: focalY(),
-          angle: angle,
-          radius: 0,
-          angularVel: angularVel,
-          radialVel: radialVel,
-          maxRadius: maxRadius,
-          size: (0.3 + Math.random() * 1.7) * sizeScale,
-        };
-      }
-
-      // One-shot fill: place embers already distributed along their spiral
-      // paths (random progress 0..1) so the field is fully populated the
-      // moment the bloom scrolls into view.
-      function prepopulate() {
-        for (let i = 0; i < EMBER_MAX; i++) {
-          const angle = Math.random() * Math.PI * 2;
-          const radialVel = 2.20 + Math.random() * 4.20;
-          const angularVel = (Math.random() - 0.5) * 0.20;
-          const maxRadius = W * (0.32 + Math.random() * 0.18);
-          const progress = Math.random();
-          embers.push({
-            cx: focalX(),
-            cy: focalY(),
-            angle: angle,
-            radius: progress * maxRadius,
-            angularVel: angularVel,
-            radialVel: radialVel,
-            maxRadius: maxRadius,
-            size: (0.3 + Math.random() * 1.7) * sizeScale,
-          });
-        }
-      }
-
-      function stepEmbers(dtMs) {
-        // Spawn rate scaled with EMBER_MAX so the field replenishes at the
-        // same proportional rate as before.
-        if (Math.random() < 0.54 && embers.length < EMBER_MAX) {
-          embers.push(spawnEmber());
-        }
-        const f = dtMs / FRAME_MS;              // frames-worth of motion this step
-        for (let i = embers.length - 1; i >= 0; i--) {
-          const e = embers[i];
-          e.angle  += e.angularVel * f;
-          e.radius += e.radialVel  * f;
-          if (e.radius >= e.maxRadius) embers.splice(i, 1);
-        }
-      }
-
-      function drawEmbers() {
-        for (let i = 0; i < embers.length; i++) {
-          const e = embers[i];
-          // Convert polar back to Cartesian for drawing.
-          const x = e.cx + Math.cos(e.angle) * e.radius;
-          const y = e.cy + Math.sin(e.angle) * e.radius;
-          // t = travel progress, 0 at centre → 1 at perimeter (maxRadius).
-          const t = Math.min(1, e.radius / e.maxRadius);
-
-          // Colour transitions across travel:
-          //   0.00 → 0.40   white   (255, 255, 255)
-          //   0.40 → 0.75   yellow  (255, 220, 100)
-          //   0.75 → 1.00   orange  (255, 140, 40)
-          let r = 255, g, b;
-          if (t < 0.40) {
-            const u = t / 0.40;
-            g = 255 - 35 * u;
-            b = 255 - 155 * u;
-          } else if (t < 0.75) {
-            const u = (t - 0.40) / 0.35;
-            g = 220 - 80 * u;
-            b = 100 - 60 * u;
-          } else {
-            g = 140;
-            b = 40;
-          }
-
-          // Alpha: fade in over first 8%, hold until 60%, fade to zero by
-          // the perimeter so they're invisible by the time they're culled.
-          let a;
-          if (t < 0.08) a = t / 0.08;
-          else if (t > 0.60) a = 1 - (t - 0.60) / 0.40;
-          else a = 1;
-          a *= 0.55;                            // subtle peak
-
-          const rgb = (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ',';
-          // Soft halo
-          ctx.fillStyle = 'rgba(' + rgb + (a * 0.28) + ')';
-          ctx.beginPath();
-          ctx.arc(x, y, e.size * 3, 0, Math.PI * 2);
-          ctx.fill();
-          // Bright core
-          ctx.fillStyle = 'rgba(' + rgb + a + ')';
-          ctx.beginPath();
-          ctx.arc(x, y, e.size, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      function draw(now, dtMs) {
-        ctx.clearRect(0, 0, W, H);
-
-        const fx = focalX();
-        const fy = focalY();
-        const radius = W * 0.18;
-
-        // 1. Single static white glow at the centre of the bloom — visible
-        //    source from which the embers emit.
-        const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, radius);
-        grad.addColorStop(0,    'rgba(255, 255, 255, 0.18)');
-        grad.addColorStop(0.55, 'rgba(255, 255, 255, 0.08)');
-        grad.addColorStop(1,    'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
-
-        // 2. Embers — additive blending so overlapping particles add up
-        //    into brighter glow rather than flat-painting over each other.
-        ctx.globalCompositeOperation = 'lighter';
-        stepEmbers(dtMs);
-        drawEmbers();
-        ctx.globalCompositeOperation = 'source-over';
-      }
-
-      let running = false;
-      let last = 0;
-      function tick(now) {
-        if (!running) return;
-        if (now - last < FRAME_MS) {
-          requestAnimationFrame(tick);
-          return;
-        }
-        const dt = last === 0 ? FRAME_MS : (now - last);
-        last = now;
-        draw(now, dt);
-        requestAnimationFrame(tick);
-      }
-
-      resize();
-      window.addEventListener('resize', resize);
-
-      // The bloom-wrap reveals with a slow opacity + scale(0.96 → 1)
-      // transition. We hold off the canvas until that transform finishes
-      // (a) so the GPU isn't fighting an animating wrapper AND a live
-      // canvas, and (b) so the canvas pixel buffer can be re-sized
-      // against the final post-scale dimensions instead of the
-      // pre-scale rect captured at init time.
-      let populated = false;
-      let revealCompleted = false;
-      let stageVisible = false;
-
-      function maybeStart() {
-        if (revealCompleted && stageVisible && !running) {
-          if (!populated) { prepopulate(); populated = true; }
-          running = true;
-          last = 0;
-          requestAnimationFrame(tick);
-        }
-      }
-
-      function markRevealCompleted() {
-        if (revealCompleted) return;
-        revealCompleted = true;
-        resize();           // canvas buffer now matches final (post-scale) size
-        maybeStart();
-      }
-
-      stage.addEventListener('transitionend', (e) => {
-        if (e.propertyName === 'transform') markRevealCompleted();
-      });
-      // Defensive fallback — if the transitionend never fires (reduced
-      // motion etc.), unblock after a generous timeout so the canvas
-      // isn't permanently dormant.
-      setTimeout(markRevealCompleted, 2500);
-
-      if ('IntersectionObserver' in window) {
-        const io = new IntersectionObserver((entries) => {
-          entries.forEach(e => {
-            stageVisible = e.isIntersecting;
-            if (e.isIntersecting) maybeStart();
-            else running = false;
-          });
-        }, { threshold: 0 });
-        io.observe(stage);
-      } else {
-        stageVisible = true;
-        revealCompleted = true;
-        maybeStart();
-      }
-
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          running = false;
-        } else {
-          maybeStart();
-        }
-      });
-    })();
-    // ===== END: bloom right-half pulse (JS) ======================
   </script>
 
   <!-- Ontology tray: glowing particles travelling down the rib streamlines (self-contained). -->
