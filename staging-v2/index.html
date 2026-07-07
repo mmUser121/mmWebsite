@@ -1992,10 +1992,9 @@
           preload="none"
           playsinline
           poster="videos/feature_reel_poster.webp">
-          <!-- WebM listed first so Chrome/Firefox/Edge prefer the smaller file;
-               Safari ignores it and falls back to the MP4. -->
-          <source src="videos/feature_reel.webm" type="video/webm" />
-          <source src="videos/feature_reel.mp4"  type="video/mp4" />
+          <!-- H.264 MP4 only (plays in all current browsers). WebM was dropped:
+               it exceeded Cloudflare Pages' 25 MiB per-file limit. -->
+          <source src="videos/feature_reel.mp4" type="video/mp4" />
         </video>
         <button
           id="featureReelPlay"
