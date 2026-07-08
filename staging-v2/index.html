@@ -133,7 +133,7 @@
       z-index: 0;
       pointer-events: none;
       opacity: 0;
-      animation: hero-bg-fadein 1300ms cubic-bezier(.16, .84, .32, 1) 200ms forwards;
+      animation: hero-bg-fadein 2800ms ease-in-out 200ms forwards;
     }
     @keyframes hero-bg-fadein {
       to { opacity: 1; }
@@ -370,8 +370,13 @@
       .hero-text {
         top: 32%;
         margin-top: 110px;
-        padding: 0 60px;
+        padding: 0 50px;
       }
+    }
+    /* Smaller phones (≤420px): tighter gutter gives the headline more width so it
+       wraps less awkwardly than at the 50px used on larger phones. */
+    @media (max-width: 420px) {
+      .hero-text { padding: 0 40px; }
     }
 
     /* Sequenced reveal — words fade up one by one, then the subheader.
@@ -538,6 +543,12 @@
     @media (min-width: 1024px) {
       .feature-reel-container { padding: 0 56px; }   /* lg:px-14 */
     }
+    /* Mobile: near full-bleed — tighter 16px gutters so the 16:9 reel reads
+       larger (was 40px, which left the frame small on a phone). Rounded frame
+       kept; no crop (native 16:9 preserved). */
+    @media (max-width: 767px) {
+      .feature-reel-container { padding: 0 16px; }
+    }
     .feature-reel-frame {
       position: relative;
       width: 100%;
@@ -584,6 +595,10 @@
       transform: translate(-50%, -50%) scale(1.04);
       outline: none;
     }
+    /* Mobile: play button a touch more visible (0.4 vs the 0.3 default). */
+    @media (max-width: 767px) {
+      .feature-reel-play { opacity: 0.4; }
+    }
     /* While playing: hide the custom button so native controls own the UI */
     .feature-reel-frame.is-playing .feature-reel-play {
       opacity: 0;
@@ -613,6 +628,7 @@
       top: calc(var(--curve-top, 6vh) + var(--curve-dy, 0px));
       left: 50%;
       width: var(--curve-w, 1300px);
+      max-width: none;              /* opt out of Tailwind's img{max-width:100%} — it capped --curve-w to the container width on mobile (curve-band clips any overflow) */
       height: auto;                 /* keep the SVG's natural ratio */
       aspect-ratio: 1482.863 / 2085.958;  /* pin ratio so height is identical cross-browser */
       --curve-w: 1140px;            /* desktop position (tuned) */
@@ -624,6 +640,36 @@
       opacity: 0.85;
     }
     @media (min-width: 1024px) { .page-curve { display: block; } }
+    /* Mobile: the curved line wraps the turbine (Section 3) at a scale, position
+       and rotation quite different from desktop. Enabled here; JS pins its
+       CENTRE to the turbine centre (so it tracks the turbine across phones and
+       rotation spins it in place). These vars set scale / horizontal + vertical
+       nudge / rotation — tune live on a phone with #curve in the URL, then bake
+       the read-out values here. */
+    @media (max-width: 767px) {
+      .page-curve {
+        display: block;
+        /* Tuned on-device via #curve, then expressed in vw so the curve scales
+           with the (also vw-based) turbine and stays consistent across screens.
+           Baked from: 970px / -108px / 400px @ 428px viewport. */
+        --curve-w: 226.64vw;
+        --curve-dx-m: -25.23vw;
+        --curve-dy-m: 93.46vw;
+        --curve-rot-m: -10deg;
+        transform:
+          translateX(-50%)
+          translate(var(--curve-dx-m, 0px), var(--curve-dy-m, 0px))
+          rotate(var(--curve-rot-m, 0deg));
+        opacity: 0;                                  /* hidden until scrolled to */
+        transition: opacity 1500ms cubic-bezier(.2, .6, .2, 1);
+      }
+      /* Fades in on scroll-down, just before the turbine reveals (JS adds the
+         class when the turbine section enters the viewport). */
+      .page-curve.curve-in { opacity: 0.85; }
+    }
+    @media (prefers-reduced-motion: reduce) and (max-width: 767px) {
+      .page-curve { opacity: 0.85; transition: none; }
+    }
 
     /* Transparent bg so the shared .curve-band curve shows through behind the
        turbine content. */
@@ -672,6 +718,27 @@
       margin: clamp(32px, 7vw, 64px) auto 0;
       aspect-ratio: 1 / 1;
       z-index: 1;
+    }
+    /* Mobile: immersive turbine (per the mobile design reference). The visual
+       overflows the screen so the disk + centre mark read much larger and the
+       emission telemetry (and the disk itself) crop at both edges. .section-ci
+       has overflow:hidden, so this creates no horizontal page scroll.
+       Centring: margin:auto can't centre an element wider than its container
+       (auto side-margins collapse to 0, pinning it left + overflowing right),
+       so centre via left:50% + translateX(-50%). 230% width and the top gap are
+       tunable dials. */
+    @media (max-width: 767px) {
+      .ci-visual {
+        width: 207%;
+        left: 50%;
+        transform: translateX(-50%);
+        /* The 1:1 box leaves large transparent bands above/below the centred
+           disk. Negative margins reclaim that empty space (layout tightens; the
+           box + emission field stay full-size). Smaller margin-top = smaller gap
+           to the video above. All three (width, top, bottom) are tunable dials. */
+        margin-top: -28vw;
+        margin-bottom: -35vw;
+      }
     }
     .turbine-canvas {
       position: absolute; inset: 0; width: 100%; height: 100%; display: block;
@@ -922,6 +989,33 @@
       white-space: nowrap;
       will-change: opacity, transform;
     }
+    /* Mobile: scale the whole ontology composition up so it crops at both screen
+       edges (matching the turbine treatment). Image widths + ground line here;
+       the node-field scale and the OBSERVATION/ACTION offsets are bumped in the
+       ontology JS. All tunable dials. */
+    @media (max-width: 767px) {
+      #refineryLayer { width: 153.9vw; }
+      #trayLayer     { width: 119.7vw; }
+      .ground-line,
+      .ground-gradient { width: 171vw; left: -35.5vw; }
+      .ground-label  { font-size: 8.25px; }   /* -25% — legible but less clutter */
+      .boot-benefit  { height: 60px; }          /* room for the longest benefit to wrap to two lines */
+      .boot-benefit .boot-word { line-height: 1.15; }   /* tighten so the two lines aren't clipped top/bottom */
+    }
+    /* iPad / tablet in PORTRAIT (targeted by orientation, not a width range —
+       iPadOS Safari "Request Desktop Website" reports ≥1024px so a width range
+       misses it). Base-sized, the ontology composition gets lost in the tall
+       viewport, leaving big vertical gaps; scale it up (node field via JS
+       ontScale) so it fills more and the gaps above/below tighten. Tunable. */
+    @media (min-width: 768px) and (orientation: portrait) {
+      #refineryLayer { width: 95vw; }
+      #trayLayer     { width: 62vw; }
+      .install-heading { top: 20vh; }        /* drop the header down toward the composition */
+      /* Higher specificity (.install-stage / body …) so these beat the base +
+         desktop rules defined later in the stylesheet. */
+      .install-stage .install-outro { bottom: 20vh; }   /* S4: pull the boot readout up toward the tray */
+      body .section-g { padding-bottom: 300px; }        /* S6: more space below the "Become a partner" CTA */
+    }
 
     /* Boot readout — two stacked machine-style lines pinned over the tray.
        Top line: the process/flow words (title case, smaller), a fast loading
@@ -1126,6 +1220,14 @@
       margin: 0 clamp(10px, 1.1vw, 18px) 0 0;
       overflow: hidden;
     }
+    /* Mobile: square tiles (1:1 vs the desktop 16:9), larger than desktop; the
+       marquee also runs 20% faster. The equal trailing margin keeps the -50%
+       loop seamless. Tunable. */
+    @media (max-width: 767px) {
+      .sector-tile  { width: clamp(200px, 60vw, 340px); aspect-ratio: 1 / 1; }
+      .sector-track { animation-duration: 35.2s; }   /* 44s × 0.8 */
+      .sector-strip { margin-bottom: 56px; }          /* extra breathing room under the carousel */
+    }
     .sector-tile img {
       width: 100%;
       height: 100%;
@@ -1186,6 +1288,13 @@
         background-size: 64% auto;
       }
     }
+    /* Mobile: trust bloom + orb scaled up (per review), and the Section 6 text
+       bumped to match. The particle burst tracks the orb width automatically. */
+    @media (max-width: 767px) {
+      .phil-bloom     { background-size: 207% auto; }     /* prev 172.5% × 1.2 */
+      .phil-bloom-orb { --orb-w: 60.76%; }                /* prev 50.63% × 1.2 */
+      .section-g .phil-sub   { font-size: 11px; }          /* much smaller, per the design (JetBrains Mono) */
+    }
     /* Bright bloom orb (bloom.webp) overlaid on the base scene. Starts small +
        hidden; JS scales it 20%→100% + fades it in (ease-out). Position/size
        tunable via the --orb-* vars. */
@@ -1238,7 +1347,8 @@
     }
 
     @media (max-width: 767px) {
-      .section-g { padding-bottom: 80px; }
+      .section-g { padding-bottom: 160px; }        /* empty space below the button, before the footer */
+      .phil-content { margin-top: 12px; }          /* gap between the bloom and the text (was a -70px overlap) */
     }
 
     .philosophy {
@@ -1259,6 +1369,13 @@
       margin: 0 auto;
       text-shadow: 0 0 16px rgba(6, 6, 14, 0.6);
     }
+    /* Two statement lines as blocks (replaces the old <br>); mobile adds a small
+       vertical gap between them. */
+    .philosophy .phil-l1,
+    .philosophy .phil-l2 { display: block; }
+    @media (max-width: 767px) {
+      .philosophy .phil-l2 { margin-top: 0.7em; }
+    }
 
     /* Mono sub-line under the philosophy headline (JetBrains Mono), revealed
        letter-by-letter (same glitch effect as the ontology flow words). */
@@ -1273,6 +1390,15 @@
       max-width: none;
       white-space: nowrap;              /* keep it on a single line (desktop) */
       margin: clamp(18px, 2.2vw, 30px) auto 0;
+    }
+    /* Mobile: the JS builder inserts a <br> after each sentence, so the three
+       statements each sit on their own line. Keep nowrap so nothing breaks
+       mid-sentence; the explicit breaks do all the wrapping. */
+    @media (max-width: 767px) {
+      .phil-sub {
+        white-space: nowrap;
+        max-width: none;
+      }
     }
 
     /* "Become a partner" CTA under the philosophy line. */
@@ -1327,10 +1453,13 @@
       gap: clamp(40px, 5vw, 80px);
       padding-bottom: clamp(64px, 8vw, 120px);   /* modest gap before locations/copyright */
     }
-    /* Mobile: extra breathing room between the invitation text ("Join us
-       on our journey") and the contact form below it. */
+    /* Mobile: "Get in touch" form leads, then "Architects of a new reality"
+       (per the mobile design). Reordered via `order` on the grid items so the
+       desktop DOM order + two-column layout are untouched. Extra row-gap keeps
+       clear breathing room between the two stacked blocks. */
     @media (max-width: 767px) {
       .footer-grid { row-gap: 100px; }
+      #contact { order: -1; }
     }
     @media (min-width: 1024px) {
       .footer-grid {
@@ -1364,10 +1493,42 @@
     .footer-col h3 .h2-line { display: block; }
 
     /* Mobile-only hero title downscale: .h1-display drops to 44px below 768px.
-       Placed AFTER the base rule so source order wins the cascade. Section
-       headers use the shared clamp(26px,3.2vw,40px) and need no override. */
+       Placed AFTER the base rule so source order wins the cascade. */
     @media (max-width: 767px) {
-      .h1-display { font-size: 44px; }
+      .h1-display { font-size: clamp(36px, 9.4vw, 40px); line-height: 1.16; }
+    }
+    /* Mobile type scale-up: section headers 32px, body copy 16px, so the type
+       reads larger on phones. Scoped to ≤767px so tablet/desktop keep the
+       clamp() scale. Hero h1 left as-is (44px). */
+    @media (max-width: 767px) {
+      .ci-heading,
+      .install-heading,
+      .think-heading,
+      .philosophy,
+      .footer-col h3 { font-size: 30px; }
+      /* Small screens: the ontology heading is the longest — let it scale down
+         a touch (stays 30px on ~430px+ phones, smaller below), balance its
+         lines so it isn't 4 ragged lines, and sit it higher (drop the desktop
+         +50px nudge) so it clears the top of the refinery. */
+      .install-heading {
+        font-size: clamp(24px, 7vw, 30px);
+        text-wrap: balance;
+        top: clamp(44px, 10vh, 96px);
+      }
+      /* S3/S5/S6 headers: balance the wrap so lines aren't ragged. text-wrap
+         inherits, so .philosophy covers its two .phil-l* lines too. */
+      .ci-heading,
+      .think-heading,
+      .philosophy { text-wrap: balance; }
+      /* S3 + S6 are the longest statements — also scale them down on smaller
+         screens (like S4) so they don't wrap awkwardly at a flat 30px. Stays 30px
+         on ~430px+ phones. S5's heading is shorter, so it stays 30px. */
+      .ci-heading,
+      .philosophy { font-size: clamp(24px, 7vw, 30px); }
+      .body-copy p,
+      .ci-text .body-copy p,
+      .think-body,
+      .footer-col p { font-size: 16px; }
     }
 
     .footer-col p {
@@ -1454,7 +1615,7 @@
     .form-field input,
     .form-field select,
     .form-field textarea {
-      background: rgba(255, 255, 255, 0.04);
+      background-color: rgba(255, 255, 255, 0.04);   /* NOT the `background` shorthand — it would wipe the select's chevron background-image */
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 4px;
       color: #FFFFFF;
@@ -1464,7 +1625,7 @@
       padding: 14px 16px;
       outline: none;
       width: 100%;
-      transition: border-color 0.2s ease, background 0.2s ease;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
       appearance: none;
       -webkit-appearance: none;
     }
@@ -1472,7 +1633,7 @@
     .form-field select:focus,
     .form-field textarea:focus {
       border-color: rgba(255, 255, 255, 0.55);
-      background: rgba(255, 255, 255, 0.06);
+      background-color: rgba(255, 255, 255, 0.06);     /* background-color only, so the chevron survives focus/selection */
     }
     .form-field input::placeholder,
     .form-field textarea::placeholder {
@@ -1578,7 +1739,7 @@
        the bottom edge of the wide bloom — the user sees both image and
        philosophy in the same scroll position. */
     @media (min-width: 1024px) {
-      .section-g { padding-bottom: clamp(90px, 9vw, 150px); }
+      .section-g { padding-bottom: calc(clamp(90px, 9vw, 150px) + 100px); }   /* +100px extra space below the CTA */
       .phil-content { margin-top: clamp(-170px, -11vw, -100px); }
       .philosophy { padding: 0; }
     }
@@ -1630,10 +1791,14 @@
         muted
         loop
         playsinline
+        webkit-playsinline="true"
         preload="auto"
         poster="videos/hero-bg.webp">
-        <source src="videos/hero-bg.webm" type="video/webm" />
-        <source src="videos/hero-bg.mp4"  type="video/mp4" />
+        <!-- H.264 MP4 only. WebM used to be listed first, but Safari advertises
+             WebM support then fails to decode it — so it selected the WebM,
+             errored, and showed nothing (no fallback), leaving the hero blank.
+             MP4/H.264 plays inline in every current browser. -->
+        <source src="videos/hero-bg.mp4" type="video/mp4" />
       </video>
     </div>
 
@@ -1652,7 +1817,7 @@
 
       <!-- ========== NAVBAR ========== -->
       <header class="w-full">
-        <nav class="relative max-w-[1440px] mx-auto px-10 md:px-10 lg:px-14 py-6 md:py-7 flex items-center justify-between">
+        <nav class="relative max-w-[1440px] mx-auto px-5 md:px-10 lg:px-14 py-6 md:py-7 flex items-center justify-between">
 
           <!-- Wordmark / Logo -->
           <a href="#" class="flex items-center" aria-label="MatterMind home">
@@ -1754,7 +1919,7 @@
       <canvas id="turbineCanvas" class="turbine-canvas turbine-emit"></canvas>
       <img class="ci-mark" src="images/mm_192.svg" alt="" />
     </div>
-    <div class="ci-inner max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+    <div class="ci-inner max-w-[1280px] mx-auto px-5 md:px-10 lg:px-14">
       <div class="ci-text">
         <h2 class="ci-heading ci-rise">Our intelligence turns disconnected data into <span class="ci-em">Connected Understanding.</span></h2>
         <div class="body-copy ci-rise" style="--rise-delay: 280ms;">
@@ -1806,7 +1971,7 @@
        Right-aligned statement + full-bleed auto-scrolling industry strip.
        ========================================= -->
   <section id="think" class="section-think">
-    <div class="max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+    <div class="max-w-[1280px] mx-auto px-5 md:px-10 lg:px-14">
       <div class="think-text">
         <h2 class="think-heading reveal-up">We are teaching infrastructure to think, across global industries.</h2>
         <p class="think-body reveal-up" style="--reveal-delay: 180ms;">With Connected Understanding, MatterMind helps physical systems produce more, waste less, and operate smarter by eliminating hidden inefficiencies.</p>
@@ -1844,10 +2009,10 @@
       <img class="phil-bloom-orb" src="images/bloom.webp" alt="" aria-hidden="true" />
       <canvas class="phil-particles" aria-hidden="true"></canvas>
     </div>
-    <div class="phil-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+    <div class="phil-content max-w-[1280px] mx-auto px-5 md:px-10 lg:px-14">
       <p class="philosophy">
-        Operational knowledge becomes measurable efficiency.<br>
-        Ownership stays with you.
+        <span class="phil-l1">Operational knowledge becomes measurable efficiency.</span>
+        <span class="phil-l2">Ownership stays with you.</span>
       </p>
       <p class="phil-sub">Correctness before growth. Simulation before action. Trust before autonomy.</p>
       <div class="partner-wrap">
@@ -1860,7 +2025,7 @@
        SECTION H — Footer / CTA
        ========================================= -->
   <section id="join" class="section-h">
-    <div class="footer-content max-w-[1280px] mx-auto px-10 md:px-10 lg:px-14">
+    <div class="footer-content max-w-[1280px] mx-auto px-5 md:px-10 lg:px-14">
       <div class="footer-grid">
 
         <!-- Left column — invitation -->
@@ -1983,14 +2148,20 @@
       if (!el) return;
       const text = el.textContent;
       const STAGGER = 24;
+      const mobile = window.matchMedia('(max-width: 767px)').matches;
       el.textContent = '';
-      Array.from(text).forEach((ch, i) => {
+      const chars = Array.from(text);
+      chars.forEach((ch, i) => {
         const s = document.createElement('span');
         s.className = 'flow-letter';
         s.textContent = ch;
         s.style.animationDelay = (i * STAGGER) + 'ms';
         s.style.animationPlayState = 'paused';   // hold hidden until revealed
         el.appendChild(s);
+        // Mobile: break after each sentence ("…growth. ", "…action. ") so the
+        // three parallel statements each sit on their own line instead of
+        // wrapping mid-phrase.
+        if (mobile && ch === ' ' && chars[i - 1] === '.') el.appendChild(document.createElement('br'));
       });
       window.__revealPhilSub = function () {
         el.querySelectorAll('.flow-letter').forEach(l => { l.style.animationPlayState = 'running'; });
@@ -2075,19 +2246,44 @@
         return;
       }
 
-      // Pause when the tab is hidden, resume on return.
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) video.pause();
-        else                 video.play().catch(() => { /* autoplay may be blocked; poster shows */ });
-      });
+      // Some browsers (esp. iOS Safari) only honour inline autoplay when muted
+      // is set as a property, not just the attribute.
+      video.muted = true;
+
+      let onScreen = true;
+      function play() { const p = video.play(); if (p && p.catch) p.catch(() => { /* autoplay may be blocked; poster shows */ }); }
+      function hardReset() { try { video.load(); } catch (_) {} play(); }   // full reload — rebuilds a lost decode pipeline
+      function resume() { if (!document.hidden && onScreen) play(); }
+
+      play();   // initial autoplay nudge (covers first paint before the IO fires)
+
+      document.addEventListener('visibilitychange', () => { if (document.hidden) video.pause(); else resume(); });
+      window.addEventListener('focus', resume);      // app-switch / window refocus
+      window.addEventListener('pageshow', resume);   // bfcache restore (back/forward nav)
+
+      // Watchdog for the device-sleep freeze: sleep suspends the decode pipeline
+      // and usually fires NO visibility/focus event on wake, so the video sits
+      // frozen (paused, or non-paused but not advancing) and play() alone can't
+      // recover it. Poll ~1.5s: if it should be playing but the clock isn't
+      // moving, kick it — and if a big real-time gap just elapsed (i.e. the
+      // device slept), hard-reset the element, which is what actually brings it
+      // back. Cheap: a single check a second, and a no-op while off-screen/hidden.
+      let lastT = -1, lastNow = Date.now();
+      setInterval(() => {
+        const now = Date.now(), gap = now - lastNow; lastNow = now;
+        if (document.hidden || !onScreen) { lastT = video.currentTime; return; }
+        if (video.paused) { gap > 4000 ? hardReset() : play(); lastT = video.currentTime; return; }
+        if (video.readyState >= 2 && video.currentTime === lastT) {
+          if (gap > 4000) hardReset();
+          else { try { video.currentTime += 0.05; } catch (_) {} play(); }
+        }
+        lastT = video.currentTime;
+      }, 1500);
 
       // Pause when the hero is off-screen — saves decode cost during scroll.
       if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver((entries) => {
-          entries.forEach(e => {
-            if (e.isIntersecting) video.play().catch(() => {});
-            else                  video.pause();
-          });
+          entries.forEach(e => { onScreen = e.isIntersecting; if (onScreen) resume(); else video.pause(); });
         }, { threshold: 0 });
         io.observe(video);
       }
@@ -2211,15 +2407,18 @@
         canvas.height = Math.max(1, cssH * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         W = cssW; H = cssH; cx = W / 2; cy = H / 2;
-        sx = W * 0.346;
-        sy = Math.min(H * 0.260, W * 0.122);
+        const ontScale = window.innerWidth <= 767 ? 2.17
+          : (window.matchMedia('(min-width: 768px) and (orientation: portrait)').matches ? 1.5 : 1);   // phone / tablet-portrait: scale the node field up (crops at the edges)
+        sx = W * 0.346 * ontScale;
+        sy = Math.min(H * 0.260, W * 0.122) * ontScale;
         updateGround();
       }
       function SXp(mx) { return cx + mx * sx; }
       function SYp(my) { return cy + my * sy; }
 
       let groundY = 0;
-      const OBS_OFFSET = 34, ACT_OFFSET = 14;
+      const _ontMobile = window.innerWidth <= 767;   // used for the logo halo below
+      const OBS_OFFSET = 34, ACT_OFFSET = 14;   // labels sit close to the horizon line (all sizes)
       const GROUND_FRAC = 0.60;
       const REF_OVERHANG = 0.13;
       const TRAY_RISE = 34;
@@ -2321,6 +2520,18 @@
           // and centre it exactly on (cx, cy) — the ground line / node heart.
           const lw = Math.min(W, H) * 0.072 * (1 + 0.03 * hb);
           const lh = lw * (442 / 455);
+          // Mobile: a subtle dark radial halo behind the mark so it reads over
+          // the busy node field (it was getting lost). Painted on-canvas (no CSS
+          // filter/blend), soft-edged, and it fades in/out with the logo.
+          if (_ontMobile) {
+            const hr = lw * 1.8;   // halo radius — tunable
+            const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, hr);
+            halo.addColorStop(0,    'rgba(6,6,14,' + (0.45 * logoReveal).toFixed(3) + ')');   // lighter behind the logo (shows through the mark's gaps)
+            halo.addColorStop(0.32, 'rgba(6,6,14,' + (0.63 * logoReveal).toFixed(3) + ')');  // darkest at the logo edge
+            halo.addColorStop(1,    'rgba(6,6,14,0)');                                        // then a soft, gradual fade outward
+            ctx.fillStyle = halo;
+            ctx.beginPath(); ctx.arc(cx, cy, hr, 0, Math.PI * 2); ctx.fill();
+          }
           ctx.globalAlpha = logoReveal * (0.82 + 0.18 * hb);
           ctx.drawImage(logo, cx - lw / 2, cy - lh / 2, lw, lh);
           ctx.globalAlpha = 1;
@@ -2380,7 +2591,12 @@
         if (!beneSlot) return;
         const span = document.createElement('span');
         span.className = 'boot-word';
-        span.textContent = text;
+        // Mobile: hard-wrap the longest benefit onto two lines (after "Self optimising").
+        if (window.innerWidth <= 767 && text === 'Self optimising industrial operations') {
+          span.innerHTML = 'Self optimising<br>industrial operations';
+        } else {
+          span.textContent = text;
+        }
         beneSlot.appendChild(span);
         const prev = benePrev.el;
         span.animate(
@@ -2401,11 +2617,16 @@
         if (beneTimer) return;
         beneIdx = 0;
         showBenefit(BOOT_BENE[0]);   // ›Efficiencies unlocked
-        beneTimer = setInterval(function () {
-          if (tabHidden || !onScreen) return;
+        // Recursive timeout (not a fixed interval) so the LAST benefit can dwell
+        // a little longer on screen before the loop cycles back to the first.
+        const dwellFor = (idx) => (idx === BOOT_BENE.length - 1) ? BENE_STEP + 400 : BENE_STEP;
+        function nextBene() {
+          if (tabHidden || !onScreen) { beneTimer = setTimeout(nextBene, BENE_STEP); return; }
           beneIdx = (beneIdx >= BOOT_BENE.length - 1) ? 1 : beneIdx + 1;   // loop the nine (1..9)
           showBenefit(BOOT_BENE[beneIdx]);
-        }, BENE_STEP);
+          beneTimer = setTimeout(nextBene, dwellFor(beneIdx));
+        }
+        beneTimer = setTimeout(nextBene, dwellFor(0));
       }
 
       function startFlow() {
@@ -2455,7 +2676,7 @@
         if (obsAnim) { obsAnim.cancel(); obsAnim = null; }
         if (actAnim) { actAnim.cancel(); actAnim = null; }
         if (flowTimer) { clearTimeout(flowTimer); flowTimer = null; }
-        if (beneTimer) { clearInterval(beneTimer); beneTimer = null; }
+        if (beneTimer) { clearTimeout(beneTimer); beneTimer = null; }
         beneIdx = 0; benePrev.el = null;
         trayLayer.style.clipPath = 'inset(0 0 100% 0)';
         if (obsLabel) { obsLabel.style.opacity = '0'; obsLabel.style.transform = 'translateY(' + OBS_OFFSET + 'px)'; }
@@ -2543,13 +2764,26 @@
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (reduced) return;
 
+      const frame = reel.querySelector('.feature-reel-frame');
       let ticking = false;
       function update() {
         const vh = window.innerHeight || 1;
-        const reelTop = reel.getBoundingClientRect().top;
-        // 0 when reelTop ≥ vh (reel below viewport); 1 when reelTop ≤ 0 (reel
-        // top at or above viewport top). Linear in between.
-        const p = Math.max(0, Math.min(1, 1 - reelTop / vh));
+        let p;
+        if (window.innerWidth <= 767 && frame) {
+          // Mobile: the reel reaches full scale (and the hero fully recedes/
+          // fades) by the time the VIDEO is vertically centred. 0 when the
+          // frame's top edge sits at the viewport bottom; 1 when the frame's
+          // centre reaches the viewport middle. Faster than desktop so the hero
+          // is barely visible by mid-screen.
+          const r = frame.getBoundingClientRect();
+          const denom = vh / 2 + r.height / 2;
+          p = Math.max(0, Math.min(1, (vh - r.top) / denom));
+        } else {
+          // Desktop/tablet (unchanged): 0 when reelTop ≥ vh (reel below
+          // viewport); 1 when reelTop ≤ 0 (reel top at or above viewport top).
+          const reelTop = reel.getBoundingClientRect().top;
+          p = Math.max(0, Math.min(1, 1 - reelTop / vh));
+        }
         root.style.setProperty('--page-scroll-progress', p.toFixed(4));
         ticking = false;
       }
@@ -2709,6 +2943,9 @@
       let rotation = 0, turbineRotation = 0, omega = 0;
       const OMEGA_STEADY = 0.08, EASE_IN_SECS = 2.2;
       const INTRO_SECS = 1.1, INTRO_DELAY = 0.7;   // turbine z-approach, then emission
+      // Mobile: emission (telemetry) starts together with the turbine reveal —
+      // no stagger. Desktop keeps the z-approach-then-emit delay.
+      const introDelay = window.innerWidth <= 767 ? 0 : INTRO_DELAY;
       let playElapsed = 0, emitOpacity = 0;
       let running = false, started = false, onScreen = false, tabHidden = false;
       let last = 0, lastFrame = 0;
@@ -2735,7 +2972,7 @@
           if (ciMark) ciMark.style.opacity = introEased.toFixed(3);
         }
         // emission (lines + text) fades in only after the turbine has approached
-        if (playElapsed > INTRO_DELAY) emitOpacity = Math.min(1, emitOpacity + dt / 1.6);
+        if (playElapsed > introDelay) emitOpacity = Math.min(1, emitOpacity + dt / 1.6);
         draw(now / 1000);
       }
 
@@ -2785,14 +3022,35 @@
       resize();
       window.addEventListener('resize', resize);
       document.addEventListener('visibilitychange', () => { tabHidden = document.hidden; maybeRun(); });
-      // Turbine playback: fires once the turbine reaches the central 40% band
-      // of the viewport, so it doesn't run while merely approaching.
+      // Turbine playback.
+      const isMobileTurbine = window.innerWidth <= 767 && !!ciMark;
       if ('IntersectionObserver' in window) {
-        const io = new IntersectionObserver((entries) => {
-          entries.forEach(e => { onScreen = e.isIntersecting; maybeRun(); });
-        }, { threshold: 0, rootMargin: '-30% 0px -30% 0px' });
-        io.observe(canvas);
-      } else { onScreen = true; }
+        if (isMobileTurbine) {
+          // Mobile: two observers, different jobs.
+          //  • Visibility gate (loose): keep the animation PLAYING the whole
+          //    time any part of the turbine is on screen; only pause once it's
+          //    fully scrolled away (perf). This is what stops it freezing
+          //    mid-scroll.
+          const vis = new IntersectionObserver((entries) => {
+            entries.forEach(e => { onScreen = e.isIntersecting; maybeRun(); });
+          }, { threshold: 0 });
+          vis.observe(canvas);
+          //  • Start trigger (tight, one-shot): begin the reveal/intro only once
+          //    the turbine is centred in view, then disconnect. The big box
+          //    overflows the screen, so this keys off the small centre mark.
+          const trig = new IntersectionObserver((entries) => {
+            entries.forEach(e => { if (e.isIntersecting) { started = true; maybeRun(); trig.disconnect(); } });
+          }, { threshold: 0, rootMargin: '-15% 0px -15% 0px' });
+          trig.observe(ciMark);
+        } else {
+          // Desktop/tablet (unchanged): one observer starts + gates run/pause
+          // once the turbine reaches the central band of the viewport.
+          const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => { onScreen = e.isIntersecting; maybeRun(); });
+          }, { threshold: 0, rootMargin: '-30% 0px -30% 0px' });
+          io.observe(canvas);
+        }
+      } else { onScreen = true; started = true; }
 
       // Text rise-in: a SEPARATE, later trigger keyed to the small text block
       // (not the large canvas), so the header + body hold off until the text
@@ -2803,12 +3061,12 @@
         if ('IntersectionObserver' in window && !reduced) {
           const tio = new IntersectionObserver((entries) => {
             entries.forEach(e => { if (e.isIntersecting) { ciText.classList.add('rise-in'); tio.disconnect(); } });
-          }, { threshold: 0, rootMargin: '-40% 0px -40% 0px' });
+          }, { threshold: 0, rootMargin: isMobileTurbine ? '-18% 0px -18% 0px' : '-40% 0px -40% 0px' });
           tio.observe(ciText);
         } else { ciText.classList.add('rise-in'); }
       }
 
-      started = true;
+      if (!isMobileTurbine) started = true;   // mobile: the tight trigger sets started when centred
       if (reduced) {
         if (turbineStill) { turbineStill.style.opacity = '1'; turbineStill.style.transform = 'none'; }
         if (ciMark) ciMark.style.opacity = '1';
@@ -2837,6 +3095,86 @@
       items.forEach(el => observer.observe(el));
     })();
 
+    // Sector marquee (Section 5) — mobile: JS-driven so the user can drag the
+    // tiles left/right; the auto-scroll resumes 2s after the last gesture.
+    // Desktop and reduced-motion keep the pure-CSS marquee untouched.
+    (function () {
+      const strip = document.querySelector('.sector-strip');
+      const track = document.querySelector('.sector-track');
+      if (!strip || !track) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (!window.matchMedia('(max-width: 767px)').matches) return;
+
+      track.style.animation = 'none';        // take over from the CSS animation
+      track.style.userSelect = 'none';
+      strip.style.touchAction = 'pan-y';     // vertical page-scroll passes through; we own horizontal
+
+      const DURATION = 35.2;                  // seconds per loop — matches the CSS
+      let half = track.offsetWidth / 2, offset = -half;
+      let dragging = false, auto = true, onScreen = false, hidden = false, down = false, gliding = false;
+      let startX = 0, startOffset = 0, idle = null, last = 0, vel = 0, moveLast = 0, moveLastX = 0;
+
+      // half = 50% of the track's own width, matching the CSS translateX(-50%)
+      // loop point, so wrapping is seamless exactly like the CSS marquee.
+      function wrap() { if (half > 0) { while (offset > 0) offset -= half; while (offset < -half) offset += half; } }
+      function apply() { track.style.transform = 'translateX(' + offset + 'px)'; }
+      apply();
+
+      function frame(t) {
+        requestAnimationFrame(frame);
+        if (!half) half = track.offsetWidth / 2;
+        const dt = last ? Math.min((t - last) / 1000, 0.05) : 0; last = t;
+        if (dragging || half <= 0) return;                     // finger owns the offset
+        if (gliding) {
+          // Momentum after release — ease out with a short exponential decay.
+          offset += vel * dt;
+          vel *= Math.exp(-dt / 0.15);
+          if (Math.abs(vel) < 12) { gliding = false; vel = 0; }
+          wrap(); apply();
+        } else if (auto && onScreen && !hidden) {
+          offset += (half / DURATION) * dt; wrap(); apply();
+        }
+      }
+      requestAnimationFrame(frame);
+
+      function onDown(e) { down = true; startX = e.clientX; startOffset = offset; if (idle) { clearTimeout(idle); idle = null; } }
+      function onMove(e) {
+        if (!down) return;
+        const dx = e.clientX - startX;
+        if (!dragging) {
+          if (Math.abs(dx) < 4) return;
+          dragging = true; auto = false; gliding = false;
+          moveLast = performance.now(); moveLastX = e.clientX;
+          try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+        const now = performance.now(), dtm = now - moveLast;
+        if (dtm > 0) { const inst = (e.clientX - moveLastX) / dtm * 1000; vel = vel * 0.7 + inst * 0.3; moveLast = now; moveLastX = e.clientX; }
+        offset = startOffset + dx; wrap(); apply();
+      }
+      function onUp() {
+        if (!down) return; down = false;
+        if (dragging) {
+          dragging = false;
+          if (performance.now() - moveLast > 100) vel = 0;   // finger was held still before release → no fling
+          gliding = Math.abs(vel) > 30;                       // glide only after a real swipe
+          vel = Math.max(-1800, Math.min(1800, vel));         // cap the fling speed
+          // Resume auto-scroll 2s after the gesture ends (glide plays out within that window).
+          if (idle) clearTimeout(idle);
+          idle = setTimeout(() => { auto = true; }, 2000);
+        }
+      }
+      track.addEventListener('pointerdown', onDown);
+      track.addEventListener('pointermove', onMove);
+      track.addEventListener('pointerup', onUp);
+      track.addEventListener('pointercancel', onUp);
+
+      window.addEventListener('resize', () => { half = track.offsetWidth / 2; wrap(); apply(); });
+      document.addEventListener('visibilitychange', () => { hidden = document.hidden; });
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver((es) => { es.forEach(e => { onScreen = e.isIntersecting; }); }, { threshold: 0 }).observe(strip);
+      } else { onScreen = true; }
+    })();
+
     // Section 6 — bloom reveal coordinator. On scroll-in: the base scene
     // (trust_bloom.webp, the .phil-bloom bg) is already showing; then the bloom
     // orb (bloom.webp) scales 20%→100% and fades in with an ease-out. The moment
@@ -2861,7 +3199,7 @@
       const FRAME_MS = 1000 / 30;
       const MAX = 220;
       const COLORS = [ [255, 255, 255], [244, 248, 255] ];
-      let W = 0, H = 0, cx = 0, cy = 0;
+      let W = 0, H = 0, cx = 0, cy = 0, partScale = 1;
       const parts = [];
 
       function resize() {
@@ -2871,16 +3209,22 @@
         canvas.height = Math.max(1, Math.round(H * DPR));
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         cx = W * 0.5; cy = H * 0.48;                 // bloom centre within the band
+        // Particle size + speed scale with the bloom orb's rendered width, so the
+        // sparks stay proportional to the bloom at any screen size (they were
+        // fixed-size — far too big against the smaller mobile bloom). Clamped ≤1
+        // so desktop is unchanged. 270 is the tunable reference width.
+        const ow = orb ? orb.offsetWidth : 0;
+        partScale = Math.min(1, (ow > 0 ? ow : W * 0.30) / 270);
       }
       function spawn() {
         const ang = Math.random() * Math.PI * 2;
-        const spd = 21 + Math.random() * 24;
+        const spd = (21 + Math.random() * 24) * partScale;
         const col = COLORS[(Math.random() * COLORS.length) | 0];
         parts.push({
           x: cx + Math.cos(ang) * 3, y: cy + Math.sin(ang) * 3,
           vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
           life: 1, decay: 0.25 + Math.random() * 0.11,
-          size: 0.3 + Math.random() * 0.6, col
+          size: (0.3 + Math.random() * 0.6) * partScale, col
         });
       }
 
@@ -2969,7 +3313,10 @@
     // both would be disrupted by parallax. Skipped under prefers-reduced-motion.
     (function () {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      if (!window.matchMedia('(min-width: 1024px)').matches) return;
+      // Require landscape too: iPadOS Safari reports ≥1024px in portrait, which
+      // would otherwise run the parallax on the iPad and drift the bloom bg out
+      // of sync with the particles. Keep it a true-desktop (landscape) effect.
+      if (!window.matchMedia('(min-width: 1024px) and (orientation: landscape)').matches) return;
 
       const els = document.querySelectorAll('[data-parallax]');
       if (!els.length) return;
@@ -3189,24 +3536,30 @@ window.RIB_PATHS=[[[0.3655,0.0033],[0.3637,0.0226],[0.3617,0.0419],[0.3594,0.061
        hold the loop on the turbine's centre: top = turbineCentre − FRAC·height. -->
   <script>
   (function () {
-    const mq      = window.matchMedia('(min-width: 1024px)');
+    const mqDesktop = window.matchMedia('(min-width: 1024px)');
     const band    = document.querySelector('.curve-band');
     const curve   = document.querySelector('.page-curve');
     const turbine = document.querySelector('#vision .ci-visual');
     if (!band || !curve || !turbine) return;
 
-    // Tuned in-browser and baked here so every browser/window size places the
-    // curve identically. Re-tune with the slider panel (git history) if needed.
+    // Desktop anchors the turbine loop at this fraction down the curve's height.
+    // Mobile anchors the curve's CENTRE on the turbine centre (0.5): the mobile
+    // curve is rotated, and rotation spins around the element centre, so a
+    // centre anchor keeps it locked in place. Horizontal / vertical nudge /
+    // rotation for mobile live in the CSS vars --curve-dx-m/-dy-m/-rot-m.
     const LOOP_FRAC = 0.365;
 
     function place() {
-      if (!mq.matches) { curve.style.top = ''; return; }   // curve is hidden < 1024px
+      const mobile = window.innerWidth <= 767;
+      // Tablet (768–1023) keeps the curve hidden — clear any pinned top.
+      if (!mqDesktop.matches && !mobile) { curve.style.top = ''; return; }
       const b = band.getBoundingClientRect();
-      const c = curve.getBoundingClientRect();
       const t = turbine.getBoundingClientRect();
-      if (!c.height || !t.height) return;                  // not laid out yet
+      const h = curve.offsetHeight;                        // intrinsic height (ignores rotate)
+      if (!h || !t.height) return;                         // not laid out yet
       const turbineC = (t.top - b.top) + t.height / 2;     // turbine centre, relative to the band
-      curve.style.top = (turbineC - LOOP_FRAC * c.height) + 'px';
+      const frac = mobile ? 0.5 : LOOP_FRAC;
+      curve.style.top = (turbineC - frac * h) + 'px';
     }
 
     const kick = () => requestAnimationFrame(place);
@@ -3215,6 +3568,59 @@ window.RIB_PATHS=[[[0.3655,0.0033],[0.3637,0.0226],[0.3617,0.0419],[0.3594,0.061
     window.addEventListener('load', kick);
     if (!curve.complete) curve.addEventListener('load', kick, { once: true });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(kick);
+
+    // Mobile: fade the curve in on scroll — it presents just before the turbine
+    // reveals. One-shot, fired when the turbine section first enters the viewport.
+    if (window.innerWidth <= 767 && 'IntersectionObserver' in window) {
+      const section = document.getElementById('vision');
+      if (section) {
+        const fio = new IntersectionObserver((entries) => {
+          entries.forEach(e => { if (e.isIntersecting) { curve.classList.add('curve-in'); fio.disconnect(); } });
+        }, { threshold: 0, rootMargin: '0px 0px -20% 0px' });
+        fio.observe(section);
+      }
+    }
+
+    // Mobile curve tuner — add #curve to the URL on your phone, drag the line
+    // into position, then send me the read-out line to bake into the CSS above.
+    if (/curve/.test(location.hash)) {
+      const rows = [
+        ['--curve-w',     'Scale',   200, 1400, 10, 'px'],
+        ['--curve-dx-m',  'X',      -400,  400,  2, 'px'],
+        ['--curve-dy-m',  'Y',      -800,  800,  2, 'px'],
+        ['--curve-rot-m', 'Rotate', -180,  180,  1, 'deg'],
+      ];
+      const val = (v) => parseFloat(getComputedStyle(curve).getPropertyValue(v)) || 0;
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:rgba(8,8,14,.95);color:#fff;font:12px/1.4 monospace;padding:10px 12px;border:1px solid #444;border-radius:10px';
+      let html = '<div style="opacity:.7;letter-spacing:.1em;margin-bottom:6px">CURVE TUNER</div>';
+      rows.forEach(([v, label, min, max, step]) => {
+        html += '<label style="display:flex;align-items:center;gap:8px;margin:6px 0">'
+          + '<span style="width:52px">' + label + '</span>'
+          + '<input type="range" data-v="' + v + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val(v) + '" style="flex:1">'
+          + '<span data-out="' + v + '" style="width:58px;text-align:right">' + val(v) + '</span></label>';
+      });
+      html += '<div id="curveOut" style="margin-top:8px;opacity:.75;word-break:break-all"></div>';
+      box.innerHTML = html;
+      document.body.appendChild(box);
+      const out = box.querySelector('#curveOut');
+      const report = () => {
+        const vw = window.innerWidth / 100;
+        const pxLine = rows.map(([v,,,,,u]) => v + ': ' + val(v) + u).join('; ');
+        const vwLine = rows.map(([v,,,,,u]) => v + ': ' + (u === 'deg' ? val(v) + 'deg' : (val(v) / vw).toFixed(2) + 'vw')).join('; ');
+        out.innerHTML = 'px: ' + pxLine + '<br><br>vw (@' + window.innerWidth + 'px): ' + vwLine;
+      };
+      box.querySelectorAll('input[type=range]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const v = inp.dataset.v, unit = rows.find(r => r[0] === v)[5];
+          curve.style.setProperty(v, inp.value + unit);
+          box.querySelector('[data-out="' + v + '"]').textContent = inp.value;
+          if (v === '--curve-w') place();   // width changes the height → re-pin
+          report();
+        });
+      });
+      report();
+    }
   })();
   </script>
 
