@@ -1291,7 +1291,7 @@
     /* Mobile: trust bloom + orb scaled up (per review), and the Section 6 text
        bumped to match. The particle burst tracks the orb width automatically. */
     @media (max-width: 767px) {
-      .phil-bloom     { background-size: 207% auto; }     /* prev 172.5% × 1.2 */
+      .phil-bloom     { background-size: 145% auto; height: 60vw; }   /* image -30% (207→145); band height matches the new rendered height (145 ÷ 2.425 ≈ 60vw) so it isn't cropped top/bottom */
       .phil-bloom-orb { --orb-w: 60.76%; }                /* prev 50.63% × 1.2 */
       .section-g .phil-sub   { font-size: 11px; }          /* much smaller, per the design (JetBrains Mono) */
     }
