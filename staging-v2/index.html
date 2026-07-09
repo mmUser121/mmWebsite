@@ -323,15 +323,13 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) scale(.97);
-      width: clamp(80px, 7vw, 130px);
+      width: clamp(57.8px, 5.06vw, 93.9px);   /* -15% ×2 */
       height: auto;
       z-index: 4;
-      filter: drop-shadow(0 0 28px rgba(255, 255, 255, 0.35));
+      /* No glow — the mark is now the clean mm_indent.svg (white, no baked halo).
+         Add a drop-shadow filter here if we decide a glow is wanted. */
       pointer-events: none;
       opacity: 0;
-      /* mark-pulse animation removed — animating drop-shadow filter forces
-         a per-frame repaint with a 28-42px blur kernel, which was a major
-         fps drain. The static drop-shadow above is painted once and cached. */
       animation: mark-reveal 1300ms cubic-bezier(.2,.6,.2,1) 200ms forwards;
     }
 
@@ -339,7 +337,7 @@
        room to breathe below it. */
     @media (max-width: 767px) {
       .mark {
-        width: 98px;
+        width: 70.5px;   /* -15% ×2 (was 98px) */
         top: 32%;
       }
     }
@@ -764,7 +762,7 @@
     .ci-mark {
       position: absolute;
       inset: 0; margin: auto;
-      width: 9%; height: auto;          /* small scale per the design ref — tunable */
+      width: 8.28%; height: auto;       /* -8% (was 9%) — small scale per the design ref, tunable */
       z-index: 3;                       /* above turbine image + emission */
       pointer-events: none;
       opacity: 0;                       /* ramps in with the turbine reveal (JS) */
@@ -909,7 +907,12 @@
       top: 60%;
       transform: translateX(-50%);
       opacity: 1;
-      clip-path: inset(0 0 100% 0);
+      /* Soft-edged reveal: a feathered mask wipes down from the top (JS slides mask-position). */
+      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 44%, transparent 52%);
+              mask-image: linear-gradient(to bottom, #000 0%, #000 44%, transparent 52%);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 100% 250%;  mask-size: 100% 250%;
+      -webkit-mask-position: 0% 100%; mask-position: 0% 100%;
     }
     #refineryLayer {
       width: min(1040px, 66vw);
@@ -1495,7 +1498,7 @@
     /* Mobile-only hero title downscale: .h1-display drops to 44px below 768px.
        Placed AFTER the base rule so source order wins the cascade. */
     @media (max-width: 767px) {
-      .h1-display { font-size: clamp(36px, 9.4vw, 40px); line-height: 1.16; }
+      .h1-display { font-size: clamp(36px, 9.4vw, 40px); line-height: 1.08; }
     }
     /* Mobile type scale-up: section headers 32px, body copy 16px, so the type
        reads larger on phones. Scoped to ≤767px so tablet/desktop keep the
@@ -1693,7 +1696,7 @@
     /* Small M-mark centred above the locations line (per the design). */
     .footer-mark {
       display: block;
-      width: clamp(30px, 3vw, 42px);
+      width: clamp(27.6px, 2.76vw, 38.6px);   /* -8% */
       height: auto;
       margin: 0 auto clamp(14px, 1.6vw, 22px);
       opacity: 0.92;
@@ -1852,7 +1855,7 @@
       </header>
 
       <!-- Center M-mark — absolutely centred on the hero (sits at the bloom centre) -->
-      <img src="images/mm_indent.png" alt="" class="mark" decoding="async" fetchpriority="high" />
+      <img src="images/mm_indent.svg" alt="" class="mark" decoding="async" fetchpriority="high" />
 
       <!-- Hero text block — always presents underneath the M-mark -->
       <div class="hero-text">
@@ -2035,7 +2038,7 @@
             <span class="h2-line">a new reality</span>
           </h3>
           <p>
-            We are seeking individuals who possess the rare combination of technical mastery combined with physical curiosity. <a href="mailto:support@mattermind.ai">Join us</a> on our journey.
+            We are seeking individuals who possess the rare combination of technical mastery and physical curiosity. <a href="mailto:support@mattermind.ai">Join us</a> on our journey.
           </p>
         </div>
 
@@ -2044,7 +2047,7 @@
         <!-- Right column — contact form -->
         <div class="footer-col" id="contact">
           <h3>Get in touch</h3>
-          <p>Inquire about partnerships, research collaborations or investment.</p>
+          <p>Inquire about partnerships, research collaborations, or investment.</p>
 
           <!--
             CONTACT FORM
@@ -2094,7 +2097,7 @@
 
       </div>
 
-      <img class="footer-mark" src="images/mm_indent.png" alt="MatterMind" width="44" decoding="async" />
+      <img class="footer-mark" src="images/mm_indent.svg" alt="MatterMind" width="44" decoding="async" />
       <p class="footer-locations">New York&nbsp;|&nbsp;London&nbsp;|&nbsp;Bangalore</p>
       <p class="footer-copyright">© 2026 MatterMind Ltd.</p>
     </div>
@@ -2130,6 +2133,23 @@
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && nav.classList.contains('is-open')) setOpen(false);
       });
+    })();
+
+    // "Intelligence" nav (#install) → jump to Section 4 and play its reveal on a
+    // timer (the ontology script's window.__installReveal) so the ontology, tray,
+    // nodes and text each appear in turn. Manual scrolling is unaffected; if the
+    // reveal isn't available we fall back to the browser's default #install jump.
+    (function () {
+      const links = document.querySelectorAll('a[href="#install"]');
+      links.forEach(a => a.addEventListener('click', (e) => {
+        if (typeof window.__installReveal !== 'function') return;
+        e.preventDefault();
+        a.blur();   // drop focus so the link reverts to white (we prevented the default nav that normally moves focus)
+        if (history.pushState) history.pushState(null, '', '#install');
+        // Defer a frame so the mobile drawer's own click handler unlocks body
+        // scroll (it also listens on this click) before we scroll.
+        requestAnimationFrame(() => window.__installReveal());
+      }));
     })();
 
     // Stagger the headline word reveal
@@ -2660,11 +2680,12 @@
           [ { opacity: 0, transform: 'translateY(' + (-ACT_OFFSET) + 'px)' },
             { opacity: 1, transform: 'translateY(0px)' } ],
           { duration: 700, easing: LABEL_EASE, fill: 'forwards' });
-        // Tray wipes fully open — doubled duration with an ease-out at the end.
+        // Tray wipes open from the top with a soft, feathered leading edge (mask-position slide).
         trayAnim = trayLayer.animate(
-          [ { clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0% 0)' } ],
+          [ { maskPosition: '0% 100%', WebkitMaskPosition: '0% 100%' },
+            { maskPosition: '0% 0%',   WebkitMaskPosition: '0% 0%' } ],
           { duration: TRAY_REVEAL_MS, easing: LABEL_EASE, fill: 'forwards' });
-        trayAnim.onfinish = () => { trayLayer.style.clipPath = 'inset(0 0 0% 0)'; };
+        trayAnim.onfinish = () => { trayLayer.style.maskPosition = '0% 0%'; trayLayer.style.webkitMaskPosition = '0% 0%'; };
         // Flow words reveal + cycle as soon as the tray STARTS revealing.
         startFlow();
       }
@@ -2678,7 +2699,7 @@
         if (flowTimer) { clearTimeout(flowTimer); flowTimer = null; }
         if (beneTimer) { clearTimeout(beneTimer); beneTimer = null; }
         beneIdx = 0; benePrev.el = null;
-        trayLayer.style.clipPath = 'inset(0 0 100% 0)';
+        trayLayer.style.maskPosition = '0% 100%'; trayLayer.style.webkitMaskPosition = '0% 100%';
         if (obsLabel) { obsLabel.style.opacity = '0'; obsLabel.style.transform = 'translateY(' + OBS_OFFSET + 'px)'; }
         if (actLabel) { actLabel.style.opacity = '0'; actLabel.style.transform = 'translateY(' + (-ACT_OFFSET) + 'px)'; }
         if (flowSlot) flowSlot.textContent = '';
@@ -2687,6 +2708,10 @@
       }
 
       let scrollTicking = false;
+      // Auto-reveal state: when active, the pin-driven reveal is fed a virtual
+      // "autoPin" (ramped over a timer) instead of the real scroll position, so a
+      // nav click can jump fast yet reveal the composition slowly. See startAutoReveal().
+      let autoReveal = false, autoPin = 0, autoRevealRAF = 0;
       function onScrollUpdate() {
         const rect = scrollSpace.getBoundingClientRect();
         const vh = window.innerHeight || 1;
@@ -2694,7 +2719,8 @@
         // rise: 0 when the section top is at the viewport bottom, 1 when it locks
         const rise = Math.max(0, Math.min(1, (vh - rect.top) / vh));
         // pin: 0 at lock, 1 at the end of the pinned scroll
-        const pin  = Math.max(0, Math.min(1, -rect.top / pinScroll));
+        let pin  = Math.max(0, Math.min(1, -rect.top / pinScroll));
+        if (autoReveal) pin = autoPin;   // nav auto-reveal drives the reveal on a timer
 
         // Header reveal — fades in and moves up as the section rises in, then
         // holds in place (no further drift during the pinned scroll).
@@ -2725,6 +2751,54 @@
       }
       function onScroll() { if (!scrollTicking) { requestAnimationFrame(onScrollUpdate); scrollTicking = true; } }
 
+      // Auto-reveal (triggered by the "Intelligence" nav): jump quickly down to
+      // the pinned section, then ramp a virtual pin so the ontology, ground line,
+      // tray and boot text each appear in turn — as if the user had slowly
+      // scrolled in. A manual wheel/touch scroll cancels it. Manual scroll = normal.
+      const REVEAL_EASE = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      function startAutoReveal() {
+        const pinScroll = Math.max(1, scrollSpace.offsetHeight - (window.innerHeight || 1));
+        const target = Math.round(scrollSpace.getBoundingClientRect().top + window.pageYOffset + 0.60 * pinScroll);
+        if (reduced) { window.scrollTo({ top: target, behavior: 'auto' }); return; }
+        if (autoRevealRAF) cancelAnimationFrame(autoRevealRAF);
+        autoReveal = true; autoPin = 0; onScrollUpdate();   // hide the pin-driven reveal before the jump
+
+        function onUser() {   // a manual scroll hands control back
+          autoReveal = false;
+          if (autoRevealRAF) cancelAnimationFrame(autoRevealRAF); autoRevealRAF = 0;
+          window.removeEventListener('wheel', onUser); window.removeEventListener('touchmove', onUser);
+        }
+
+        // Phase 1 — quick jump to the pinned section (reveal stays hidden at autoPin 0).
+        const startY = window.pageYOffset;
+        const jumpMS = Math.min(700, Math.max(200, Math.abs(target - startY) * 0.25));
+        const j0 = performance.now();
+        (function jump(now) {
+          if (!autoReveal) return;
+          const t = Math.min(1, (now - j0) / jumpMS);
+          window.scrollTo({ top: Math.round(startY + (target - startY) * REVEAL_EASE(t)), behavior: 'auto' });
+          if (t < 1) autoRevealRAF = requestAnimationFrame(jump);
+          else reveal();
+        })(j0);
+
+        // Phase 2 — ramp the virtual pin 0 → 0.6 so the reveal plays out on a timer.
+        function reveal() {
+          window.addEventListener('wheel', onUser, { passive: true });
+          window.addEventListener('touchmove', onUser, { passive: true });
+          const REVEAL_MS = 3200;   // how long the elements take to appear — raise = slower
+          const r0 = performance.now();
+          (function step(now) {
+            if (!autoReveal) return;
+            const t = Math.min(1, (now - r0) / REVEAL_MS);
+            autoPin = 0.60 * REVEAL_EASE(t);
+            onScrollUpdate();
+            if (t < 1) autoRevealRAF = requestAnimationFrame(step);
+            else { autoReveal = false; autoRevealRAF = 0; window.removeEventListener('wheel', onUser); window.removeEventListener('touchmove', onUser); }
+          })(r0);
+        }
+      }
+      window.__installReveal = startAutoReveal;
+
       function maybeRun() {
         if (!started || tabHidden || !onScreen || reduced) { running = false; return; }
         if (!running) { running = true; last = performance.now(); lastFrame = 0; requestAnimationFrame(tick); }
@@ -2745,7 +2819,7 @@
 
       started = true;
       onScrollUpdate();
-      if (reduced) { growth = 1; logoReveal = 1; canvas.style.opacity = '1'; refineryLayer.style.opacity = '1'; trayLayer.style.clipPath = 'inset(0 0 0 0)'; groundLine.style.transform = 'scaleX(1)'; groundGrad.style.opacity = '1'; obsLabel.style.opacity = '1'; actLabel.style.opacity = '1'; obsLabel.style.transform = 'none'; actLabel.style.transform = 'none'; if (installHeading) { installHeading.style.opacity = '1'; installHeading.style.transform = 'translateX(-50%)'; } if (outro) outro.style.opacity = '1'; if (flowSlot) flowSlot.innerHTML = '<span class="boot-word">Transformed ›</span>'; if (beneSlot) beneSlot.innerHTML = '<span class="boot-word">Efficiencies unlocked</span>'; draw(0, 0); }
+      if (reduced) { growth = 1; logoReveal = 1; canvas.style.opacity = '1'; refineryLayer.style.opacity = '1'; trayLayer.style.maskPosition = '0% 0%'; trayLayer.style.webkitMaskPosition = '0% 0%'; groundLine.style.transform = 'scaleX(1)'; groundGrad.style.opacity = '1'; obsLabel.style.opacity = '1'; actLabel.style.opacity = '1'; obsLabel.style.transform = 'none'; actLabel.style.transform = 'none'; if (installHeading) { installHeading.style.opacity = '1'; installHeading.style.transform = 'translateX(-50%)'; } if (outro) outro.style.opacity = '1'; if (flowSlot) flowSlot.innerHTML = '<span class="boot-word">Transformed ›</span>'; if (beneSlot) beneSlot.innerHTML = '<span class="boot-word">Efficiencies unlocked</span>'; draw(0, 0); }
       else maybeRun();
     })();
 
@@ -2941,7 +3015,7 @@
       }
 
       let rotation = 0, turbineRotation = 0, omega = 0;
-      const OMEGA_STEADY = 0.08, EASE_IN_SECS = 2.2;
+      const OMEGA_START = 0.08, OMEGA_STEADY = 0.16, EASE_IN_SECS = 4;   // already spinning at reveal (OMEGA_START = original speed), accelerating to 2x (0.16) over 4s; drives both turbine + emission
       const INTRO_SECS = 1.1, INTRO_DELAY = 0.7;   // turbine z-approach, then emission
       // Mobile: emission (telemetry) starts together with the turbine reveal —
       // no stagger. Desktop keeps the z-approach-then-emit delay.
@@ -2959,7 +3033,7 @@
         playElapsed += dt;
         const e = Math.min(1, playElapsed / EASE_IN_SECS);
         const eased = e * e * (3 - 2 * e);
-        omega = OMEGA_STEADY * eased;
+        omega = OMEGA_START + (OMEGA_STEADY - OMEGA_START) * eased;
         rotation += omega * dt;
         turbineRotation += omega * 4 * dt;
         // turbine image (DOM element behind the curve): rotate + z-approach intro
