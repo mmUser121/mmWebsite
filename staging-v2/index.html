@@ -52,7 +52,7 @@
   <!-- Google Fonts: Noto Serif Display, Sora, Share Tech Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Serif+Display:ital,wght@0,300;0,400;1,300&family=Share+Tech+Mono&family=Sora:wght@100;200;300;400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;400;500&family=Noto+Serif+Display:ital,wght@0,300;0,400;1,300&family=Share+Tech+Mono&family=Sora:wght@100;200;300;400&display=swap" rel="stylesheet">
 
   <!-- Tailwind theme extension -->
   <script>
@@ -737,6 +737,8 @@
         margin-top: -28vw;
         margin-bottom: -35vw;
       }
+      /* Pull the S3 text block up nearer the turbine (mobile only). Tunable dial. */
+      .ci-inner { margin-top: -10vw; }
     }
     .turbine-canvas {
       position: absolute; inset: 0; width: 100%; height: 100%; display: block;
@@ -760,15 +762,15 @@
        (opacity is JS-driven) and beats via a transform-scale-only heartbeat, so
        no filter/blend is animated (GPU-composited, cheap). */
     .ci-mark {
+      /* Centre M-mark removed from the S3 design. The element is retained,
+         permanently transparent, purely as the mobile start-trigger anchor
+         (the IntersectionObserver keys off it — it marks the composition centre). */
       position: absolute;
       inset: 0; margin: auto;
-      width: 8.28%; height: auto;       /* -8% (was 9%) — small scale per the design ref, tunable */
-      z-index: 3;                       /* above turbine image + emission */
+      width: 8.28%; height: auto;
+      z-index: 3;
       pointer-events: none;
-      opacity: 0;                       /* ramps in with the turbine reveal (JS) */
-      filter: brightness(0) invert(1);  /* black artwork → white (static, not animated) */
-      transform-origin: center center;
-      animation: ci-heartbeat 1.7s ease-in-out infinite;
+      opacity: 0;                       /* never revealed */
     }
     /* lub-dub then rest — very subtle (max +5%) */
     @keyframes ci-heartbeat {
@@ -877,14 +879,18 @@
        refinery → node field → tray reveal cleanly. */
     .install-scroll {
       position: relative;
-      /* 180vh → ~80vh of pinned scroll. The reveal finishes by pin ~0.44 and
-         the auto sequence fires at 0.48; the shorter section trims the "dead"
-         pinned scroll after that so it unlocks to Section 5 sooner. */
-      height: 180vh;
+      /* Normal one-viewport section — the reveal now auto-plays on view (see
+         playReveal), so there is no pinned scroll-scrub to leave room for. */
+      height: 100vh;
     }
     .install-stage {
-      position: sticky;
-      top: 0;
+      /* Was position:sticky, but the section is now a plain 100vh block (the
+         reveal is time-driven, not scroll-pinned). A sticky element in a
+         same-height container has zero travel and jitters stuck/unstuck on
+         scroll — re-compositing the layered canvas/line/refinery and flickering
+         (visible on mobile). position:relative keeps the absolute children
+         anchored here without any of that. */
+      position: relative;
       height: 100vh;
       overflow: hidden;
       background: transparent;
@@ -906,7 +912,7 @@
       z-index: 2;
       top: 60%;
       transform: translateX(-50%);
-      opacity: 1;
+      opacity: 0.8;   /* tray + animated nodes at 80% */
       /* Soft-edged reveal: a feathered mask wipes down from the top (JS slides mask-position). */
       -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 44%, transparent 52%);
               mask-image: linear-gradient(to bottom, #000 0%, #000 44%, transparent 52%);
@@ -914,6 +920,7 @@
       -webkit-mask-size: 100% 250%;  mask-size: 100% 250%;
       -webkit-mask-position: 0% 100%; mask-position: 0% 100%;
     }
+    #trayLayer img { opacity: 0.9; }   /* dim the tray image a further 10% (the flow-nodes canvas is unaffected) */
     #refineryLayer {
       width: min(1040px, 66vw);
       z-index: 3;
@@ -998,12 +1005,19 @@
        ontology JS. All tunable dials. */
     @media (max-width: 767px) {
       #refineryLayer { width: 153.9vw; }
-      #trayLayer     { width: 119.7vw; }
+      #trayLayer     { width: 81.4vw; }   /* -20% then a further -15% */
       .ground-line,
       .ground-gradient { width: 171vw; left: -35.5vw; }
       .ground-label  { font-size: 8.25px; }   /* -25% — legible but less clutter */
       .boot-benefit  { height: 60px; }          /* room for the longest benefit to wrap to two lines */
       .boot-benefit .boot-word { line-height: 1.15; }   /* tighten so the two lines aren't clipped top/bottom */
+      .install-outro .boot-benefit { top: -40px; }   /* move the benefits up 40px (relative) */
+      /* The caption is a long equation — let it wrap within the screen on mobile. */
+      .install-outro .boot-flow { height: 48px; margin-bottom: 10px; top: -70px; }   /* wrapped caption + gap; caption moved up 70px (relative) */
+      /* Higher specificity than the base .boot-flow .boot-word (which is later in
+         source), so the mobile font-size + wrap win. */
+      .install-outro .boot-flow .boot-word { white-space: normal; line-height: 1.7; text-wrap: balance; font-size: 10px; }   /* mobile caption size */
+      .install-outro .perf-br { display: inline; }   /* force the caption onto two lines on mobile */
     }
     /* iPad / tablet in PORTRAIT (targeted by orientation, not a width range —
        iPadOS Safari "Request Desktop Website" reports ≥1024px so a width range
@@ -1016,7 +1030,7 @@
       .install-heading { top: 20vh; }        /* drop the header down toward the composition */
       /* Higher specificity (.install-stage / body …) so these beat the base +
          desktop rules defined later in the stylesheet. */
-      .install-stage .install-outro { bottom: 20vh; }   /* S4: pull the boot readout up toward the tray */
+      .install-stage .install-outro { bottom: calc(20vh - 25px); }   /* S4: readout position (moved the caption+benefits group down 30px) */
       body .section-g { padding-bottom: 300px; }        /* S6: more space below the "Become a partner" CTA */
     }
 
@@ -1047,6 +1061,7 @@
       margin-bottom: clamp(6px, 1vh, 12px);
       perspective: 900px;
     }
+    .perf-br { display: none; }   /* caption line-break — shown on mobile only */
     .boot-benefit {
       position: relative;
       height: clamp(28px, 4.4vh, 44px);
@@ -1071,9 +1086,17 @@
        adds a gap after the last glyph, which otherwise shifts centred text
        left of the logo/heading). */
     .boot-flow .boot-word {
-      font-size: clamp(13px, 1.15vw, 17px);
-      letter-spacing: 0.14em;
-      padding-left: 0.14em;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;                 /* matched to the philosophy sub-line */
+      font-size: clamp(12px, 1.05vw, 15px);   /* matched to the philosophy sub-line */
+      letter-spacing: 0.01em;
+      padding-left: 0.01em;             /* cancels the trailing letter-spacing (optical centring) */
+      line-height: 1.7;
+      animation: caption-fade-in 900ms ease-out both;   /* fade the caption in when it appears */
+    }
+    @keyframes caption-fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      .boot-flow .boot-word { animation: none; }
     }
     /* Bottom line — larger, uppercased benefit (same centring correction). */
     .boot-benefit .boot-word {
@@ -1296,7 +1319,7 @@
     @media (max-width: 767px) {
       .phil-bloom     { background-size: 145% auto; height: 60vw; }   /* image -30% (207→145); band height matches the new rendered height (145 ÷ 2.425 ≈ 60vw) so it isn't cropped top/bottom */
       .phil-bloom-orb { --orb-w: 60.76%; }                /* prev 50.63% × 1.2 */
-      .section-g .phil-sub   { font-size: 11px; }          /* much smaller, per the design (JetBrains Mono) */
+      .section-g .phil-sub   { font-size: 10px; }          /* JetBrains Mono */
     }
     /* Bright bloom orb (bloom.webp) overlaid on the base scene. Starts small +
        hidden; JS scales it 20%→100% + fades it in (ease-out). Position/size
@@ -1516,7 +1539,7 @@
       .install-heading {
         font-size: clamp(24px, 7vw, 30px);
         text-wrap: balance;
-        top: clamp(44px, 10vh, 96px);
+        top: calc(clamp(44px, 10vh, 96px) + 30px);   /* dropped ~30px lower on mobile */
       }
       /* S3/S5/S6 headers: balance the wrap so lines aren't ragged. text-wrap
          inherits, so .philosophy covers its two .phil-l* lines too. */
@@ -1945,15 +1968,13 @@
          flow line + benefits readout (bottom) — matching the design. -->
     <div class="install-scroll">
       <div class="install-stage">
-        <h2 class="install-heading">MatterMind installs the <em class="install-em">intelligence layer</em><br class="install-br"> physical systems have never had.</h2>
+        <h2 class="install-heading">MatterMind gives physical systems the<br class="install-br"> <em class="install-em">intelligence layer</em> they&rsquo;ve never had.</h2>
 
         <div id="trayLayer" class="ontology-layer" aria-hidden="true"><img src="images/tray.png" alt="" loading="lazy" decoding="async" /></div>
         <div id="refineryLayer" class="ontology-layer" aria-hidden="true"><img src="images/refinery.png" alt="" loading="lazy" decoding="async" /><span class="tower-beacon beacon-a"></span><span class="tower-beacon beacon-b"></span></div>
         <canvas id="ontologyCanvas" aria-hidden="true"></canvas>
         <div id="groundGrad" class="ground-gradient" aria-hidden="true"></div>
         <div id="groundLine" class="ground-line" aria-hidden="true"></div>
-        <div id="obsLabel" class="ground-label" aria-hidden="true">OBSERVATION</div>
-        <div id="actLabel" class="ground-label" aria-hidden="true">ACTION</div>
 
         <!-- Boot readout: top line loads the flow words fast and holds on
              "Transformed"; bottom line then revolves the benefits one by one.
@@ -2325,8 +2346,6 @@
       const trayLayer = document.getElementById('trayLayer');
       const groundLine = document.getElementById('groundLine');
       const groundGrad = document.getElementById('groundGrad');
-      const obsLabel = document.getElementById('obsLabel');
-      const actLabel = document.getElementById('actLabel');
       const outro = document.querySelector('.install-outro');
       const installHeading = document.querySelector('.install-heading');
       if (!scrollSpace || !refineryLayer || !trayLayer) return;
@@ -2380,6 +2399,15 @@
         for (let s = 0; s < sat.length; s++) explicit.push([sat[s], sat[(s + 1) % sat.length]]);
       }
 
+      // Extra fill in the TOP-LEFT quadrant (mx<0, my<0) — it read sparser than
+      // the other quarters. These auto-link to their nearest neighbours (below),
+      // so lines + travelling pulses fill in there too.
+      for (let k = 0; k < 16; k++) {
+        const mx = -(0.12 + hsh(k * 3.1 + 40) * 0.68);   // -0.12 … -0.80 (left)
+        const my = -(0.08 + hsh(k * 4.7 + 51) * 0.44);   // -0.08 … -0.52 (up)
+        nodes.push({ mx, my, size: 1.0 + hsh(k + 60) * 1.0 });
+      }
+
       const N = nodes.length;
       for (let i = 0; i < N; i++) {
         const dist = Math.min(1, Math.hypot(nodes[i].mx, nodes[i].my * 0.45));
@@ -2414,9 +2442,9 @@
       const logo = new Image();
       let logoReady = false;
       logo.onload = () => { logoReady = true; };
-      logo.src = 'images/mm_indent.png';
+      logo.src = 'images/mm_sensor.png';
 
-      let W = 0, H = 0, cx = 0, cy = 0, sx = 1, sy = 1;
+      let W = 0, H = 0, cx = 0, cy = 0, sx = 1, sy = 1, nodeYOffset = 0;
       const FRAME_MS = 1000 / 30;
       const DPR_CAP = 1.5;
 
@@ -2427,21 +2455,23 @@
         canvas.height = Math.max(1, cssH * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         W = cssW; H = cssH; cx = W / 2; cy = H / 2;
-        const ontScale = window.innerWidth <= 767 ? 2.17
+        const mob = window.innerWidth <= 767;
+        const ontScale = mob ? 2.17
           : (window.matchMedia('(min-width: 768px) and (orientation: portrait)').matches ? 1.5 : 1);   // phone / tablet-portrait: scale the node field up (crops at the edges)
-        sx = W * 0.346 * ontScale;
-        sy = Math.min(H * 0.260, W * 0.122) * ontScale;
+        sx = W * 0.346 * ontScale * (mob ? 0.8 : 1);           // mobile: node field -20% width
+        sy = Math.min(H * 0.260, W * 0.122) * ontScale * 0.7;  // vertical depth squashed -30%
+        nodeYOffset = Math.min(W, H) * 0.02;   // lift the node field up so it clears the pod's bottom edge — dial
         updateGround();
       }
       function SXp(mx) { return cx + mx * sx; }
-      function SYp(my) { return cy + my * sy; }
+      function SYp(my) { return cy + my * sy - nodeYOffset; }
 
       let groundY = 0;
       const _ontMobile = window.innerWidth <= 767;   // used for the logo halo below
       const OBS_OFFSET = 34, ACT_OFFSET = 14;   // labels sit close to the horizon line (all sizes)
       const GROUND_FRAC = 0.60;
       const REF_OVERHANG = 0.13;
-      const TRAY_RISE = 34;
+      const TRAY_DROP_D = 30, TRAY_DROP_M = 10;   // tray offset (px) below the ground line (desktop / mobile) — dials
       function updateGround() {
         groundY = H * GROUND_FRAC;
         cy = groundY;
@@ -2450,9 +2480,7 @@
         refineryLayer.style.transform = 'translateX(-50%)';
         groundLine.style.top = groundY + 'px';
         groundGrad.style.top = groundY + 'px';
-        obsLabel.style.top = (groundY - OBS_OFFSET) + 'px';
-        actLabel.style.top = (groundY + ACT_OFFSET) + 'px';
-        trayLayer.style.top = (groundY - TRAY_RISE) + 'px';
+        trayLayer.style.top = (groundY + (window.innerWidth <= 767 ? TRAY_DROP_M : TRAY_DROP_D)) + 'px';
       }
 
       let growth = 0, logoReveal = 0;
@@ -2536,23 +2564,12 @@
         }
 
         if (logoReady && logoReveal > 0.01) {
-          // Preserve the mark's native aspect (455×442) so it isn't stretched,
-          // and centre it exactly on (cx, cy) — the ground line / node heart.
-          const lw = Math.min(W, H) * 0.072 * (1 + 0.03 * hb);
-          const lh = lw * (442 / 455);
-          // Mobile: a subtle dark radial halo behind the mark so it reads over
-          // the busy node field (it was getting lost). Painted on-canvas (no CSS
-          // filter/blend), soft-edged, and it fades in/out with the logo.
-          if (_ontMobile) {
-            const hr = lw * 1.8;   // halo radius — tunable
-            const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, hr);
-            halo.addColorStop(0,    'rgba(6,6,14,' + (0.45 * logoReveal).toFixed(3) + ')');   // lighter behind the logo (shows through the mark's gaps)
-            halo.addColorStop(0.32, 'rgba(6,6,14,' + (0.63 * logoReveal).toFixed(3) + ')');  // darkest at the logo edge
-            halo.addColorStop(1,    'rgba(6,6,14,0)');                                        // then a soft, gradual fade outward
-            ctx.fillStyle = halo;
-            ctx.beginPath(); ctx.arc(cx, cy, hr, 0, Math.PI * 2); ctx.fill();
-          }
-          ctx.globalAlpha = logoReveal * (0.82 + 0.18 * hb);
+          // Sensor pod (mm_sensor.png), centred on (cx, cy) = the ground line /
+          // node heart, so it straddles the horizon. Native aspect preserved.
+          const aspect = (logo.naturalWidth && logo.naturalHeight) ? (logo.naturalHeight / logo.naturalWidth) : 0.9;
+          const lw = Math.min(W, H) * (window.innerWidth <= 767 ? 0.25 : 0.22) * (1 + 0.02 * hb);   // scale dial (mobile / desktop)
+          const lh = lw * aspect;
+          ctx.globalAlpha = logoReveal;
           ctx.drawImage(logo, cx - lw / 2, cy - lh / 2, lw, lh);
           ctx.globalAlpha = 1;
         }
@@ -2573,14 +2590,15 @@
       const flowSlot = document.querySelector('.boot-flow');
       const beneSlot = document.querySelector('.boot-benefit');
       const BOOT_FLOW = ['Industrial world ›', 'Sensed ›', 'Understood ›', 'Decided ›', 'Optimised ›', 'Transformed ›'];
-      // Index 0 is the "Efficiencies unlocked" intro; 1..9 are the nine benefits
-      // that loop. Stored sentence-case; CSS uppercases them.
-      const BOOT_BENE = ['Efficiencies unlocked', 'Energy intelligence', 'Yield maximisation', 'Fast failure', 'Anomaly mitigation', 'Throughput acceleration', 'Bottleneck elimination', 'Safety & carbon gains', 'Capex avoidance', 'Self optimising industrial operations'];
+      // Persistent caption above the benefits, then the benefits that cycle one
+      // by one (stored sentence-case; CSS uppercases them).
+      const PERF_LINE = 'Physical Systems + Connected Understanding <br class="perf-br">= Industrial Intelligence.';
+      const BOOT_BENE = ['Unlocking efficiencies', 'Energy intelligence', 'Yield maximisation', 'Anomaly mitigation', 'Throughput acceleration', 'Bottleneck elimination', 'Safety & carbon gains', 'Capex avoidance', 'Self optimising industrial operations'];
       const FLOW_FIRST = 1200;    // "Industrial world ›" holds a touch longer
       const FLOW_STEP  = 700;     // each subsequent flow word
       const LETTER_STAGGER = 28;  // per-letter reveal stagger
       const BENE_DELAY = 550;     // beat after "Transformed ›" before benefits begin
-      const BENE_STEP  = 1000;    // benefit dwell
+      const BENE_STEP  = 1400;    // benefit dwell (+0.4s each)
       const BENE_ANIM  = 440;     // benefit roll (in/out) duration
       const TRAY_REVEAL_MS = 2000;   // doubled, with an ease-out for a premium feel
 
@@ -2636,13 +2654,13 @@
       function startBenefits() {
         if (beneTimer) return;
         beneIdx = 0;
-        showBenefit(BOOT_BENE[0]);   // ›Efficiencies unlocked
+        showBenefit(BOOT_BENE[0]);   // first benefit
         // Recursive timeout (not a fixed interval) so the LAST benefit can dwell
         // a little longer on screen before the loop cycles back to the first.
         const dwellFor = (idx) => (idx === BOOT_BENE.length - 1) ? BENE_STEP + 400 : BENE_STEP;
         function nextBene() {
           if (tabHidden || !onScreen) { beneTimer = setTimeout(nextBene, BENE_STEP); return; }
-          beneIdx = (beneIdx >= BOOT_BENE.length - 1) ? 1 : beneIdx + 1;   // loop the nine (1..9)
+          beneIdx = (beneIdx >= BOOT_BENE.length - 1) ? 0 : beneIdx + 1;   // loop all benefits
           showBenefit(BOOT_BENE[beneIdx]);
           beneTimer = setTimeout(nextBene, dwellFor(beneIdx));
         }
@@ -2651,35 +2669,17 @@
 
       function startFlow() {
         if (flowTimer || !flowSlot) return;
-        let i = 0;
-        showFlowWord(BOOT_FLOW[0]);
-        function nextFlow() {
-          i++;
-          showFlowWord(BOOT_FLOW[i]);
-          if (i >= BOOT_FLOW.length - 1) {   // "Transformed ›" shown → holds; short beat, then benefits begin
-            flowTimer = setTimeout(startBenefits, BENE_DELAY);
-            return;
-          }
-          flowTimer = setTimeout(nextFlow, FLOW_STEP);
-        }
-        flowTimer = setTimeout(nextFlow, FLOW_FIRST);
+        // Persistent caption (no longer a cycling flow line), then the benefits.
+        flowSlot.innerHTML = '<span class="boot-word">' + PERF_LINE + '</span>';
+        flowTimer = setTimeout(startBenefits, BENE_DELAY);
       }
 
-      // Auto reveal: tray wipes fully open, then the flow text starts.
+      // Auto reveal: tray wipes fully open, then the readout starts.
       const LABEL_EASE = 'cubic-bezier(.16,.84,.3,1)';   // ease-out — premium feel
       function autoStart() {
         if (autoOn || reduced) return;
         autoOn = true;
         if (outro) outro.style.opacity = '1';
-        // OBSERVATION elevates up / ACTION lowers down, both from the ground line.
-        if (obsLabel) obsAnim = obsLabel.animate(
-          [ { opacity: 0, transform: 'translateY(' + OBS_OFFSET + 'px)' },
-            { opacity: 1, transform: 'translateY(0px)' } ],
-          { duration: 700, easing: LABEL_EASE, fill: 'forwards' });
-        if (actLabel) actAnim = actLabel.animate(
-          [ { opacity: 0, transform: 'translateY(' + (-ACT_OFFSET) + 'px)' },
-            { opacity: 1, transform: 'translateY(0px)' } ],
-          { duration: 700, easing: LABEL_EASE, fill: 'forwards' });
         // Tray wipes open from the top with a soft, feathered leading edge (mask-position slide).
         trayAnim = trayLayer.animate(
           [ { maskPosition: '0% 100%', WebkitMaskPosition: '0% 100%' },
@@ -2690,112 +2690,61 @@
         startFlow();
       }
 
-      function autoReset() {
-        if (!autoOn) return;
-        autoOn = false;
-        if (trayAnim) { trayAnim.cancel(); trayAnim = null; }
-        if (obsAnim) { obsAnim.cancel(); obsAnim = null; }
-        if (actAnim) { actAnim.cancel(); actAnim = null; }
-        if (flowTimer) { clearTimeout(flowTimer); flowTimer = null; }
-        if (beneTimer) { clearTimeout(beneTimer); beneTimer = null; }
-        beneIdx = 0; benePrev.el = null;
-        trayLayer.style.maskPosition = '0% 100%'; trayLayer.style.webkitMaskPosition = '0% 100%';
-        if (obsLabel) { obsLabel.style.opacity = '0'; obsLabel.style.transform = 'translateY(' + OBS_OFFSET + 'px)'; }
-        if (actLabel) { actLabel.style.opacity = '0'; actLabel.style.transform = 'translateY(' + (-ACT_OFFSET) + 'px)'; }
-        if (flowSlot) flowSlot.textContent = '';
-        if (beneSlot) beneSlot.textContent = '';
-        if (outro) outro.style.opacity = '0';
-      }
-
       let scrollTicking = false;
-      // Auto-reveal state: when active, the pin-driven reveal is fed a virtual
-      // "autoPin" (ramped over a timer) instead of the real scroll position, so a
-      // nav click can jump fast yet reveal the composition slowly. See startAutoReveal().
-      let autoReveal = false, autoPin = 0, autoRevealRAF = 0;
+      // autoPin (0→~0.6) drives the whole ontology reveal on a timer (see
+      // playReveal), so the composition plays once when the section enters view
+      // rather than scrubbing with scroll position.
+      let autoPin = 0;
       function onScrollUpdate() {
         const rect = scrollSpace.getBoundingClientRect();
         const vh = window.innerHeight || 1;
-        const pinScroll = Math.max(1, rect.height - vh);
         // rise: 0 when the section top is at the viewport bottom, 1 when it locks
         const rise = Math.max(0, Math.min(1, (vh - rect.top) / vh));
-        // pin: 0 at lock, 1 at the end of the pinned scroll
-        let pin  = Math.max(0, Math.min(1, -rect.top / pinScroll));
-        if (autoReveal) pin = autoPin;   // nav auto-reveal drives the reveal on a timer
-
-        // Header reveal — fades in and moves up as the section rises in, then
-        // holds in place (no further drift during the pinned scroll).
+        // Header reveal — fades in and moves up as the section rises into view.
+        // (This is the ONLY thing that runs on scroll now — see applyReveal.)
         if (installHeading && !reduced) {
           const enterY = (1 - ramp(rise, 0.12, 0.9)) * 46;   // enters from +46px → 0
           installHeading.style.opacity = ramp(rise, 0.12, 0.7).toFixed(3);
           installHeading.style.transform = 'translateX(-50%) translateY(' + enterY.toFixed(1) + 'px)';
         }
-
-        // Refinery fades in during the rise — before the header locks.
-        refineryLayer.style.opacity = ramp(rise, 0.35, 1.0).toFixed(3);
-
-        // Ontology network + ground line reveal during the pinned scroll.
-        canvas.style.opacity = ramp(pin, 0.00, 0.08).toFixed(3);
-        logoReveal           = ramp(pin, 0.02, 0.14);
-        growth               = ramp(pin, 0.05, 0.42);
-
-        const lineReveal = ramp(pin, 0.20, 0.44);
-        groundLine.style.transform = 'scaleX(' + lineReveal.toFixed(4) + ')';
-        groundGrad.style.opacity = ramp(pin, 0.24, 0.46).toFixed(3);
-
-        // Once the nodes are fully grown AND the ground line has extended fully
-        // across the screen, auto-play the rest (labels → tray → flow → benefits).
-        // Labels + tray are no longer scroll-driven; they run in autoStart().
-        if (pin >= 0.48) autoStart(); else if (pin < 0.42) autoReset();
-
         scrollTicking = false;
+      }
+      // The ontology reveal (canvas nodes / logo / ground line / red gradient) is
+      // TIME-driven — applied ONLY here, called by playReveal as autoPin ramps, and
+      // NEVER on scroll. Re-writing these overlapping GPU-layer styles on every
+      // scroll frame made them re-composite and flicker on rapid up/down scroll
+      // (esp. mobile). Refinery is always-on, set once at init.
+      function applyReveal(p) {
+        canvas.style.opacity = ramp(p, 0.00, 0.08).toFixed(3);
+        logoReveal           = ramp(p, 0.02, 0.14);
+        growth               = ramp(p, 0.05, 0.42);
+        groundLine.style.transform = 'scaleX(' + ramp(p, 0.20, 0.44).toFixed(4) + ')';
+        groundGrad.style.opacity = (ramp(p, 0.24, 0.46) * 0.7).toFixed(3);   // red gradient -30%
+        if (p >= 0.48) autoStart();
       }
       function onScroll() { if (!scrollTicking) { requestAnimationFrame(onScrollUpdate); scrollTicking = true; } }
 
-      // Auto-reveal (triggered by the "Intelligence" nav): jump quickly down to
-      // the pinned section, then ramp a virtual pin so the ontology, ground line,
-      // tray and boot text each appear in turn — as if the user had slowly
-      // scrolled in. A manual wheel/touch scroll cancels it. Manual scroll = normal.
+      // Reveal the ontology composition when the section enters view: a one-shot
+      // timer ramps autoPin so the nodes grow, the ground line draws, the tray
+      // wipes open and the benefits cycle. Plays once — no scroll-scrub, no reset.
       const REVEAL_EASE = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      let revealStarted = false;
+      function playReveal() {
+        if (revealStarted || reduced) return;
+        revealStarted = true;
+        const REVEAL_MS = 3200;   // how long the composition takes to reveal — tunable
+        const r0 = performance.now();
+        (function step(now) {
+          const t = Math.min(1, (now - r0) / REVEAL_MS);
+          autoPin = 0.60 * REVEAL_EASE(t);
+          applyReveal(autoPin);
+          if (t < 1) requestAnimationFrame(step);
+        })(r0);
+      }
+      // "Intelligence" nav → scroll to this section; the reveal auto-plays on view.
       function startAutoReveal() {
-        const pinScroll = Math.max(1, scrollSpace.offsetHeight - (window.innerHeight || 1));
-        const target = Math.round(scrollSpace.getBoundingClientRect().top + window.pageYOffset + 0.60 * pinScroll);
-        if (reduced) { window.scrollTo({ top: target, behavior: 'auto' }); return; }
-        if (autoRevealRAF) cancelAnimationFrame(autoRevealRAF);
-        autoReveal = true; autoPin = 0; onScrollUpdate();   // hide the pin-driven reveal before the jump
-
-        function onUser() {   // a manual scroll hands control back
-          autoReveal = false;
-          if (autoRevealRAF) cancelAnimationFrame(autoRevealRAF); autoRevealRAF = 0;
-          window.removeEventListener('wheel', onUser); window.removeEventListener('touchmove', onUser);
-        }
-
-        // Phase 1 — quick jump to the pinned section (reveal stays hidden at autoPin 0).
-        const startY = window.pageYOffset;
-        const jumpMS = Math.min(700, Math.max(200, Math.abs(target - startY) * 0.25));
-        const j0 = performance.now();
-        (function jump(now) {
-          if (!autoReveal) return;
-          const t = Math.min(1, (now - j0) / jumpMS);
-          window.scrollTo({ top: Math.round(startY + (target - startY) * REVEAL_EASE(t)), behavior: 'auto' });
-          if (t < 1) autoRevealRAF = requestAnimationFrame(jump);
-          else reveal();
-        })(j0);
-
-        // Phase 2 — ramp the virtual pin 0 → 0.6 so the reveal plays out on a timer.
-        function reveal() {
-          window.addEventListener('wheel', onUser, { passive: true });
-          window.addEventListener('touchmove', onUser, { passive: true });
-          const REVEAL_MS = 3200;   // how long the elements take to appear — raise = slower
-          const r0 = performance.now();
-          (function step(now) {
-            if (!autoReveal) return;
-            const t = Math.min(1, (now - r0) / REVEAL_MS);
-            autoPin = 0.60 * REVEAL_EASE(t);
-            onScrollUpdate();
-            if (t < 1) autoRevealRAF = requestAnimationFrame(step);
-            else { autoReveal = false; autoRevealRAF = 0; window.removeEventListener('wheel', onUser); window.removeEventListener('touchmove', onUser); }
-          })(r0);
-        }
+        const target = Math.round(scrollSpace.getBoundingClientRect().top + window.pageYOffset);
+        window.scrollTo({ top: target, behavior: reduced ? 'auto' : 'smooth' });
       }
       window.__installReveal = startAutoReveal;
 
@@ -2805,9 +2754,19 @@
       }
 
       resize();
+      refineryLayer.style.opacity = '1';   // refinery + beacons always visible (set once, not on scroll)
+      applyReveal(0);                       // hidden reveal state until playReveal ramps autoPin
       if (refineryImg.complete && refineryImg.naturalHeight) { updateGround(); onScrollUpdate(); }
       refineryImg.addEventListener('load', () => { updateGround(); onScrollUpdate(); });
-      window.addEventListener('resize', () => { resize(); onScrollUpdate(); });
+      // Only recompute on a WIDTH change (orientation / real resize). Height-only
+      // changes (mobile URL-bar show/hide during scroll) would reset the canvas
+      // backing store — a blank frame — and reflow the layers, i.e. flicker.
+      let lastResizeW = window.innerWidth;
+      window.addEventListener('resize', () => {
+        if (window.innerWidth === lastResizeW) return;
+        lastResizeW = window.innerWidth;
+        resize(); applyReveal(autoPin); onScrollUpdate();
+      });
       window.addEventListener('scroll', onScroll, { passive: true });
       document.addEventListener('visibilitychange', () => { tabHidden = document.hidden; maybeRun(); });
       if ('IntersectionObserver' in window) {
@@ -2815,11 +2774,16 @@
           entries.forEach(e => { onScreen = e.isIntersecting; maybeRun(); });
         }, { threshold: 0.02 });
         io.observe(canvas);
-      } else { onScreen = true; }
+        // One-shot: start the reveal once the composition is centred in view.
+        const revealIO = new IntersectionObserver((entries) => {
+          entries.forEach(e => { if (e.isIntersecting) { playReveal(); revealIO.disconnect(); } });
+        }, { threshold: 0, rootMargin: '-25% 0px -25% 0px' });
+        revealIO.observe(canvas);
+      } else { onScreen = true; playReveal(); }
 
       started = true;
       onScrollUpdate();
-      if (reduced) { growth = 1; logoReveal = 1; canvas.style.opacity = '1'; refineryLayer.style.opacity = '1'; trayLayer.style.maskPosition = '0% 0%'; trayLayer.style.webkitMaskPosition = '0% 0%'; groundLine.style.transform = 'scaleX(1)'; groundGrad.style.opacity = '1'; obsLabel.style.opacity = '1'; actLabel.style.opacity = '1'; obsLabel.style.transform = 'none'; actLabel.style.transform = 'none'; if (installHeading) { installHeading.style.opacity = '1'; installHeading.style.transform = 'translateX(-50%)'; } if (outro) outro.style.opacity = '1'; if (flowSlot) flowSlot.innerHTML = '<span class="boot-word">Transformed ›</span>'; if (beneSlot) beneSlot.innerHTML = '<span class="boot-word">Efficiencies unlocked</span>'; draw(0, 0); }
+      if (reduced) { autoPin = 1; growth = 1; logoReveal = 1; canvas.style.opacity = '1'; refineryLayer.style.opacity = '1'; trayLayer.style.maskPosition = '0% 0%'; trayLayer.style.webkitMaskPosition = '0% 0%'; groundLine.style.transform = 'scaleX(1)'; groundGrad.style.opacity = '0.7'; if (installHeading) { installHeading.style.opacity = '1'; installHeading.style.transform = 'translateX(-50%)'; } if (outro) outro.style.opacity = '1'; if (flowSlot) flowSlot.innerHTML = '<span class="boot-word">' + PERF_LINE + '</span>'; if (beneSlot) beneSlot.innerHTML = '<span class="boot-word">Unlocking efficiencies</span>'; draw(0, 0); }
       else maybeRun();
     })();
 
@@ -3041,9 +3005,9 @@
           const introE = Math.min(1, playElapsed / INTRO_SECS);
           const introEased = introE * introE * (3 - 2 * introE);
           turbineStill.style.transform = 'rotate(' + turbineRotation + 'rad) scale(' + (0.55 + 0.45 * introEased) + ')';
-          turbineStill.style.opacity = introEased.toFixed(3);
-          // centre mark fades in with the turbine (transform is owned by its heartbeat animation)
-          if (ciMark) ciMark.style.opacity = introEased.toFixed(3);
+          turbineStill.style.opacity = introEased.toFixed(3);   // turbine image settles at 100%
+          // Centre M-mark removed from the design — the .ci-mark element is kept
+          // ONLY as the mobile start-trigger anchor (below), so it never fades in.
         }
         // emission (lines + text) fades in only after the turbine has approached
         if (playElapsed > introDelay) emitOpacity = Math.min(1, emitOpacity + dt / 1.6);
@@ -3072,11 +3036,11 @@
           const r2 = Math.max(rin * 0.4, r - (rout - rin) * 0.16);
           const gx = cx + Math.cos(ang) * r2, gy = cy + Math.sin(ang) * r2;
           const grad = ctx.createLinearGradient(x, y, gx, gy);
-          grad.addColorStop(0, `rgba(255,255,255,${(alpha * 0.7).toFixed(3)})`);
+          grad.addColorStop(0, `rgba(255,255,255,${alpha.toFixed(3)})`);       // full-strength white line (was ×0.7)
           grad.addColorStop(1, 'rgba(255,255,255,0)');
           ctx.strokeStyle = grad; ctx.lineWidth = 1.2;
           ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gx, gy); ctx.stroke();
-          ctx.fillStyle = `rgba(255,255,255,${(alpha * 0.9).toFixed(3)})`;
+          ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;             // full-strength node dot (was ×0.9)
           ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
           let textA;
           if (u < 0.12) textA = u / 0.12;
@@ -3135,7 +3099,7 @@
         if ('IntersectionObserver' in window && !reduced) {
           const tio = new IntersectionObserver((entries) => {
             entries.forEach(e => { if (e.isIntersecting) { ciText.classList.add('rise-in'); tio.disconnect(); } });
-          }, { threshold: 0, rootMargin: isMobileTurbine ? '-18% 0px -18% 0px' : '-40% 0px -40% 0px' });
+          }, { threshold: 0, rootMargin: isMobileTurbine ? '-6% 0px -6% 0px' : '-40% 0px -40% 0px' });
           tio.observe(ciText);
         } else { ciText.classList.add('rise-in'); }
       }
@@ -3365,12 +3329,12 @@
         new IntersectionObserver((es) => {
           es.forEach(e => { onScreen = e.isIntersecting; maybe(); });
         }, { threshold: 0.05 }).observe(canvas);
-        // Delayed trigger — the bottom inset shrinks the root to the top 40% of
-        // the viewport, so the sequence only fires once the bloom has scrolled
-        // right up near the top (well into the section).
+        // Trigger — the bottom inset shrinks the root to the top 70% of the
+        // viewport, so the bloom presents earlier as it scrolls up into view.
+        // (Smaller magnitude = fires earlier / bloom lower on screen — dial.)
         const io2 = new IntersectionObserver((es) => {
           es.forEach(e => { if (e.isIntersecting) { startSequence(); io2.disconnect(); } });
-        }, { threshold: 0, rootMargin: '0px 0px -60% 0px' });
+        }, { threshold: 0, rootMargin: '0px 0px -30% 0px' });
         io2.observe(bloom);
       } else { onScreen = true; startSequence(); }
       document.addEventListener('visibilitychange', () => { hidden = document.hidden; maybe(); });
