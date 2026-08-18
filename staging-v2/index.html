@@ -123,6 +123,84 @@
       --hero-darken-alpha: calc(0.55 * var(--hero-progress));            /* 0.00 → 0.55 */
     }
 
+    /* Scroll cue — a coral data-pulse falls down a hairline, centred just above
+       the fold. Fades in ~2.4s after load (once the hero has settled) and fades
+       out fast as soon as the user scrolls (tied to the hero scroll progress).
+       Echoes the ground line / node pulses / #FFA398 beacons elsewhere. */
+    .scroll-cue {
+      position: absolute;
+      left: 50%;
+      bottom: clamp(20px, 4.5vh, 46px);
+      transform: translateX(-50%);
+      z-index: 5;
+      pointer-events: none;
+      opacity: max(0, calc(1 - var(--hero-progress, 0) * 7));   /* ~gone by 14% scroll */
+    }
+    .scroll-cue-in {
+      position: relative;
+      width: 2px;
+      height: 52px;
+      animation: scroll-cue-in 900ms ease-out 2400ms both;      /* fade in after the hero settles */
+    }
+    @keyframes scroll-cue-in { from { opacity: 0; } to { opacity: 1; } }
+    .scroll-cue-line {
+      position: absolute; inset: 0; border-radius: 2px;
+      background: linear-gradient(to bottom,
+        rgba(255,255,255,0) 0%, rgba(255,255,255,0.18) 22%,
+        rgba(255,255,255,0.18) 78%, rgba(255,255,255,0) 100%);
+    }
+    .scroll-cue-dot {
+      position: absolute; left: 50%; top: 0;
+      width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%;
+      background: #FFA398;
+      box-shadow: 0 0 5px 1px rgba(255,163,152,0.9), 0 0 12px 3px rgba(255,163,152,0.4);
+      animation: scroll-cue-drop 2.1s cubic-bezier(.5,0,.5,1) infinite;
+    }
+    @keyframes scroll-cue-drop {
+      0%   { transform: translateY(2px);  opacity: 0; }
+      18%  { opacity: 1; }
+      82%  { opacity: 1; }
+      100% { transform: translateY(48px); opacity: 0; }
+    }
+    /* Arrowhead — two 45° arms flank the line's bottom tip, flashing a brief
+       downward arrow as the pulse lands, then fading out before the next pulse
+       appears at the top. Same 2.1s loop as the dot, so they stay in sync. */
+    .scroll-cue-arrow {
+      position: absolute;
+      left: 50%;
+      bottom: 2px;                       /* tip at the pulse's lowest point */
+      width: 2px; height: 2px;
+      transform: translateX(-50%);
+      opacity: 0;
+      animation: scroll-cue-arrow 2.1s linear infinite;
+    }
+    .scroll-cue-arm {
+      position: absolute;
+      bottom: 0; left: 50%;
+      width: 2px; height: 12px;
+      margin-left: -1px;
+      border-radius: 1px;
+      background: rgba(255, 255, 255, 0.18);   /* match the vertical line (white, same weight — no glow) */
+      transform-origin: bottom center;
+    }
+    .scroll-cue-arm.l { transform: rotate(-45deg); }   /* up-left */
+    .scroll-cue-arm.r { transform: rotate(45deg); }    /* up-right → V points down */
+    @keyframes scroll-cue-arrow {
+      0%, 82% { opacity: 0; }
+      89%     { opacity: 1; }
+      96%     { opacity: 0.7; }
+      100%    { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .scroll-cue-in { animation: none; }
+      .scroll-cue-dot { animation: none; top: 40%; opacity: 0.9; }
+      .scroll-cue-arrow { animation: none; opacity: 0.85; }   /* static down-arrow */
+    }
+    /* Mobile: lift the cue clear of the iOS Safari URL bar at the bottom. Dial. */
+    @media (max-width: 767px) {
+      .scroll-cue { bottom: clamp(60px, 10vh, 92px); }
+    }
+
     /* Hero video fade-wrapper — handles the LOAD-time fade-in (opacity 0→1
        over 1300ms, 200ms delay) so it doesn't conflict with the scroll-linked
        opacity applied directly to .hero-bg below. Composite visible opacity =
@@ -208,6 +286,20 @@
       );
       z-index: 3;
       pointer-events: none;
+    }
+    /* Mobile: the video is shifted up 18%, so its hard bottom edge lands ~82%
+       down. Make the fade taller and reach full #06060E before that edge so it
+       dissolves into the page background instead of showing a crude cut line. */
+    @media (max-width: 767px) {
+      .hero-fade {
+        height: 46%;
+        background: linear-gradient(
+          to bottom,
+          rgba(6, 6, 14, 0) 0%,
+          rgba(6, 6, 14, 1) 55%,
+          rgba(6, 6, 14, 1) 100%
+        );
+      }
     }
 
     .hero-content {
@@ -1894,6 +1986,18 @@
         </p>
       </div>
     </div>
+      <!-- Scroll cue — a coral data-pulse falls down a hairline just above the
+           fold; fades in after the hero settles, fades out fast on scroll. -->
+      <div class="scroll-cue" aria-hidden="true">
+        <div class="scroll-cue-in">
+          <span class="scroll-cue-line"></span>
+          <span class="scroll-cue-dot"></span>
+          <span class="scroll-cue-arrow">
+            <span class="scroll-cue-arm l"></span>
+            <span class="scroll-cue-arm r"></span>
+          </span>
+        </div>
+      </div>
   </section>
 
   <!-- =========================================
